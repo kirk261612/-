@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
   </head>
   <body>
     <div class="app-shell">
@@ -22,6 +22,10 @@
             <span class="nav-icon">◆</span>
             智能纪要
           </a>
+          <a class="nav-item" href="#intelligence">
+            <span class="nav-icon">◇</span>
+            智能评分
+          </a>
           <a class="nav-item" href="#actions">
             <span class="nav-icon">□</span>
             待办追踪
@@ -29,6 +33,10 @@
           <a class="nav-item" href="#ask">
             <span class="nav-icon">◐</span>
             纪要追问
+          </a>
+          <a class="nav-item" href="#export">
+            <span class="nav-icon">⇣</span>
+            纪要导出
           </a>
         </nav>
 
@@ -48,6 +56,7 @@
           </div>
           <div class="top-actions">
             <button class="ghost-button" id="copyButton">复制纪要</button>
+            <button class="ghost-button" id="exportMarkdownButton">导出 MD</button>
             <button class="primary-button top-generate" id="generateButton">生成纪要</button>
           </div>
         </header>
@@ -113,6 +122,41 @@
           <section class="analysis-pane" aria-label="纪要洞察区">
             <div class="summary-band" id="summaryList"></div>
 
+            <div class="intelligence-grid" id="intelligence">
+              <article class="panel score-panel">
+                <div class="panel-head compact">
+                  <h3>会议质量评分</h3>
+                  <span class="panel-tag">AI Score</span>
+                </div>
+                <div class="score-body">
+                  <div class="score-ring" id="scoreRing">
+                    <strong id="qualityScore">0</strong>
+                    <span>score</span>
+                  </div>
+                  <div class="score-copy">
+                    <h4 id="qualityLabel">等待分析</h4>
+                    <p id="qualityReason">生成纪要后将评估结论明确度、待办完整度和风险可控性。</p>
+                  </div>
+                </div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-head compact">
+                  <h3>发言人贡献</h3>
+                  <span class="panel-tag">Speaker Map</span>
+                </div>
+                <div class="speaker-list" id="speakerList"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-head compact">
+                  <h3>下一步建议</h3>
+                  <span class="panel-tag">Next Best Action</span>
+                </div>
+                <ul class="next-list" id="nextStepList"></ul>
+              </article>
+            </div>
+
             <div class="insight-grid">
               <article class="panel">
                 <div class="panel-head compact">
@@ -133,7 +177,11 @@
             <article class="panel wide" id="actions">
               <div class="panel-head compact">
                 <h3>待办事项</h3>
-                <span class="panel-tag">Action Tracker</span>
+                <div class="segmented" id="actionFilters" aria-label="待办筛选">
+                  <button class="segment active" data-filter="全部">全部</button>
+                  <button class="segment" data-filter="待开始">待开始</button>
+                  <button class="segment" data-filter="进行中">进行中</button>
+                </div>
               </div>
               <div class="table-wrap">
                 <table>
@@ -161,10 +209,10 @@
 
               <article class="panel">
                 <div class="panel-head compact">
-                  <h3>处理流程</h3>
-                  <span class="panel-tag">Workflow</span>
+                  <h3>转写统计</h3>
+                  <span class="panel-tag">Transcript Stats</span>
                 </div>
-                <ol class="timeline" id="timelineList"></ol>
+                <div class="stat-grid" id="transcriptStats"></div>
               </article>
             </div>
           </section>
@@ -186,6 +234,15 @@
             </div>
 
             <pre id="answerBox"></pre>
+
+            <div class="export-box" id="export">
+              <span class="eyebrow">Delivery Center</span>
+              <h3>交付动作</h3>
+              <div class="export-actions">
+                <button class="ghost-button" id="exportJsonButton">导出 JSON</button>
+                <button class="ghost-button" id="exportMarkdownButtonSide">导出 Markdown</button>
+              </div>
+            </div>
           </aside>
         </div>
       </main>
@@ -193,6 +250,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
   </body>
 </html>

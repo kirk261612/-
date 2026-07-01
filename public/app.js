@@ -8,7 +8,9 @@ const sampleText = `张敏：今天讨论 7 月运营活动复盘和下周上线
 
 const state = {
   minutes: null,
-  toastTimer: null
+  toastTimer: null,
+  actionFilter: "全部",
+  lastTranscript: ""
 };
 
 const $ = selector => document.querySelector(selector);
@@ -124,6 +126,77 @@ function summarizeLocal(title, transcript) {
   };
 }
 
+function analyzeTranscript(transcript) {
+  const rawLines = transcript.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const speakers = {};
+  rawLines.forEach(line => {
+    const match = line.match(/^([\u4e00-\u9fa5A-Za-z0-9_ -]{2,12})[：:]\s*(.*)$/);
+    if (!match) return;
+    const name = match[1].trim();
+    const content = match[2] || "";
+    speakers[name] = (speakers[name] || 0) + Math.max(1, content.length);
+  });
+  const speakerStats = Object.entries(speakers)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+  const sentences = splitSentences(transcript);
+  return {
+    chars: transcript.replace(/\s/g, "").length,
+    lines: rawLines.length,
+    sentences: sentences.length,
+    speakers: speakerStats.length,
+    speakerStats
+  };
+}
+
+function scoreMinutes(minutes, stats) {
+  const actionItems = minutes.actionItems || [];
+  const decisions = minutes.decisions || [];
+  const risks = minutes.risks || [];
+  const dueReady = actionItems.filter(item => item.due && item.due !== "待确认").length;
+  const ownerReady = actionItems.filter(item => item.owner && item.owner !== "待分配").length;
+  const actionCompleteness = actionItems.length ? Math.round(((dueReady + ownerReady) / (actionItems.length * 2)) * 24) : 0;
+  const score = Math.max(48, Math.min(96,
+    54 +
+    Math.min(decisions.length * 7, 18) +
+    Math.min(actionItems.length * 3, 15) +
+    actionCompleteness +
+    Math.min(stats.speakers * 2, 8) -
+    Math.max(risks.length - 2, 0) * 4
+  ));
+  let label = "可执行";
+  if (score >= 86) label = "高质量纪要";
+  else if (score < 68) label = "需要补充";
+  return {
+    score,
+    label,
+    reason: `识别到 ${decisions.length} 条决策、${actionItems.length} 条待办、${risks.length} 个风险点；责任人与截止时间完整度约 ${actionCompleteness}/24。`
+  };
+}
+
+function buildNextSteps(minutes) {
+  const actions = minutes.actionItems || [];
+  const risks = minutes.risks || [];
+  const firstPending = actions.find(item => item.status !== "已完成");
+  const steps = [];
+  if (firstPending) steps.push(`优先推进：${firstPending.owner} 负责的“${firstPending.task}”。`);
+  if (risks.length) steps.push(`风险闭环：针对“${risks[0]}”设置检查点。`);
+  steps.push("会后同步：将决策和待办复制到项目群或任务系统。");
+  steps.push("复盘指标：下次会议回看转化率、咨询量和待办完成率。");
+  return steps.slice(0, 4);
+}
+
+function enrichMinutes(minutes, transcript) {
+  const stats = analyzeTranscript(transcript);
+  return {
+    ...minutes,
+    transcriptStats: stats,
+    speakerStats: stats.speakerStats,
+    quality: scoreMinutes(minutes, stats),
+    nextSteps: buildNextSteps(minutes)
+  };
+}
+
 function buildAnswer(question, minutes) {
   const q = question.trim();
   if (!q) return "请先输入一个追问问题。";
@@ -207,6 +280,84 @@ function setMetrics(minutes) {
   $("#riskCount").textContent = String((minutes.risks || []).length);
 }
 
+function renderQuality(minutes) {
+  const quality = minutes.quality || { score: 0, label: "等待分析", reason: "生成纪要后将展示质量评估。" };
+  $("#qualityScore").textContent = String(quality.score);
+  $("#qualityLabel").textContent = quality.label;
+  $("#qualityReason").textContent = quality.reason;
+  $("#scoreRing").style.background = `conic-gradient(var(--teal) 0deg, var(--teal) ${quality.score * 3.6}deg, #e7e2d8 ${quality.score * 3.6}deg)`;
+}
+
+function renderSpeakerStats(items) {
+  const node = $("#speakerList");
+  node.innerHTML = "";
+  if (!items || !items.length) {
+    const empty = document.createElement("span");
+    empty.className = "empty";
+    empty.textContent = "暂无发言人数据";
+    node.appendChild(empty);
+    return;
+  }
+  const max = Math.max(...items.map(item => item.value), 1);
+  items.slice(0, 5).forEach(item => {
+    const row = document.createElement("div");
+    row.className = "speaker-row";
+    const name = document.createElement("span");
+    name.className = "speaker-name";
+    name.textContent = item.name;
+    const bar = document.createElement("div");
+    bar.className = "speaker-bar";
+    const fill = document.createElement("span");
+    fill.style.width = `${Math.max(8, Math.round((item.value / max) * 100))}%`;
+    bar.appendChild(fill);
+    const count = document.createElement("span");
+    count.className = "speaker-count";
+    count.textContent = `${item.value}`;
+    row.append(name, bar, count);
+    node.appendChild(row);
+  });
+}
+
+function renderNextSteps(items) {
+  listItems("#nextStepList", items || []);
+}
+
+function renderTranscriptStats(stats) {
+  const node = $("#transcriptStats");
+  node.innerHTML = "";
+  const rows = [
+    ["字符数", stats?.chars || 0],
+    ["发言人", stats?.speakers || 0],
+    ["段落", stats?.lines || 0],
+    ["句子", stats?.sentences || 0]
+  ];
+  rows.forEach(([label, value]) => {
+    const div = document.createElement("div");
+    div.className = "stat-item";
+    div.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+    node.appendChild(div);
+  });
+}
+
+function renderActionTable(minutes) {
+  const table = $("#actionTable");
+  table.innerHTML = "";
+  const items = (minutes.actionItems || []).filter(item => state.actionFilter === "全部" || item.status === state.actionFilter);
+  if (!items.length) {
+    table.innerHTML = `<tr><td class="empty" colspan="4">当前筛选下暂无待办</td></tr>`;
+    return;
+  }
+  items.forEach(item => {
+    const tr = document.createElement("tr");
+    [item.owner, item.task, item.due, item.status].forEach(value => {
+      const td = document.createElement("td");
+      td.textContent = value || "待确认";
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+}
+
 function renderMinutes(minutes) {
   state.minutes = minutes;
   $("#resultTitle").textContent = minutes.title || "结构化纪要";
@@ -227,19 +378,11 @@ function renderMinutes(minutes) {
   listItems("#decisionList", minutes.decisions || []);
   listItems("#riskList", minutes.risks || []);
   renderChips("#topicList", minutes.topics || []);
-  renderTimeline(minutes.timeline || []);
-
-  const table = $("#actionTable");
-  table.innerHTML = "";
-  (minutes.actionItems || []).forEach(item => {
-    const tr = document.createElement("tr");
-    [item.owner, item.task, item.due, item.status].forEach(value => {
-      const td = document.createElement("td");
-      td.textContent = value || "待确认";
-      tr.appendChild(td);
-    });
-    table.appendChild(tr);
-  });
+  renderQuality(minutes);
+  renderSpeakerStats(minutes.speakerStats || []);
+  renderNextSteps(minutes.nextSteps || []);
+  renderTranscriptStats(minutes.transcriptStats || {});
+  renderActionTable(minutes);
 
   const hints = $("#hintList");
   hints.innerHTML = "";
@@ -262,7 +405,10 @@ function renderInitial() {
   listItems("#decisionList", ["等待生成"]);
   listItems("#riskList", ["等待生成"]);
   renderChips("#topicList", ["运营", "上线", "客服", "FAQ"]);
-  renderTimeline(["输入会议转写文本", "生成结构化纪要", "复制纪要或继续追问"]);
+  renderQuality({});
+  renderSpeakerStats([]);
+  renderNextSteps(["生成纪要后将展示优先推进事项。"]);
+  renderTranscriptStats(analyzeTranscript(sampleText));
   $("#actionTable").innerHTML = `<tr><td class="empty" colspan="4">等待生成待办事项</td></tr>`;
 }
 
@@ -287,13 +433,14 @@ async function generateMinutes() {
   }
 
   setLoading(true);
+  state.lastTranscript = transcript;
   $("#answerBox").textContent = "";
   try {
     const payload = await postJson("/api/minutes", { title, transcript });
-    renderMinutes(payload.minutes);
+    renderMinutes(enrichMinutes(payload.minutes, transcript));
     showToast("纪要已生成。");
   } catch (error) {
-    const minutes = summarizeLocal(title, transcript);
+    const minutes = enrichMinutes(summarizeLocal(title, transcript), transcript);
     renderMinutes(minutes);
     showToast("后端 API 暂不可用，已自动切换到浏览器本地兜底。");
   } finally {
@@ -326,7 +473,13 @@ function copyMinutes() {
     return;
   }
   const minutes = state.minutes;
-  const text = [
+  const text = buildMarkdown(minutes);
+  navigator.clipboard.writeText(text);
+  showToast("纪要已复制。");
+}
+
+function buildMarkdown(minutes) {
+  return [
     `# ${minutes.title}`,
     "",
     "## 摘要",
@@ -339,25 +492,71 @@ function copyMinutes() {
     ...(minutes.actionItems || []).map(item => `- ${item.owner}：${item.task}（${item.due}，${item.status}）`),
     "",
     "## 风险",
-    ...(minutes.risks || []).map(item => `- ${item}`)
+    ...(minutes.risks || []).map(item => `- ${item}`),
+    "",
+    "## 下一步建议",
+    ...((minutes.nextSteps || []).map(item => `- ${item}`))
   ].join("\n");
-  navigator.clipboard.writeText(text);
-  showToast("纪要已复制。");
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportMarkdown() {
+  if (!state.minutes) {
+    showToast("请先生成纪要。");
+    return;
+  }
+  downloadFile(`${state.minutes.title || "minutes"}.md`, buildMarkdown(state.minutes), "text/markdown;charset=utf-8");
+  showToast("Markdown 已导出。");
+}
+
+function exportJson() {
+  if (!state.minutes) {
+    showToast("请先生成纪要。");
+    return;
+  }
+  downloadFile(`${state.minutes.title || "minutes"}.json`, JSON.stringify(state.minutes, null, 2), "application/json;charset=utf-8");
+  showToast("JSON 已导出。");
 }
 
 $("#generateButton").addEventListener("click", generateMinutes);
 $("#generateButtonSecondary").addEventListener("click", generateMinutes);
 $("#askButton").addEventListener("click", askQuestion);
 $("#copyButton").addEventListener("click", copyMinutes);
+$("#exportMarkdownButton").addEventListener("click", exportMarkdown);
+$("#exportMarkdownButtonSide").addEventListener("click", exportMarkdown);
+$("#exportJsonButton").addEventListener("click", exportJson);
+$("#actionFilters").addEventListener("click", event => {
+  const button = event.target.closest("[data-filter]");
+  if (!button) return;
+  state.actionFilter = button.dataset.filter;
+  $("#actionFilters").querySelectorAll(".segment").forEach(item => item.classList.toggle("active", item === button));
+  if (state.minutes) renderActionTable(state.minutes);
+});
 $("#loadSampleButton").addEventListener("click", () => {
   $("#transcriptInput").value = sampleText;
+  renderTranscriptStats(analyzeTranscript(sampleText));
   showToast("示例会议已载入。");
 });
 $("#fileInput").addEventListener("change", async event => {
   const [file] = event.target.files;
   if (!file) return;
   $("#transcriptInput").value = await file.text();
+  renderTranscriptStats(analyzeTranscript($("#transcriptInput").value));
   showToast("文本已导入。");
+});
+$("#transcriptInput").addEventListener("input", () => {
+  renderTranscriptStats(analyzeTranscript($("#transcriptInput").value));
 });
 $("#questionInput").addEventListener("keydown", event => {
   if (event.key === "Enter") askQuestion();
