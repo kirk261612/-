@@ -7,10 +7,146 @@ const sampleText = `张敏：今天讨论 7 月运营活动复盘和下周上线
 陈洁：会议结论是本周五灰度上线，下周一看转化率和咨询量数据，再决定是否扩大流量。`;
 
 const state = {
-  minutes: null
+  minutes: null,
+  toastTimer: null
 };
 
 const $ = selector => document.querySelector(selector);
+
+function unique(items) {
+  return [...new Set(items.filter(Boolean))];
+}
+
+function splitSentences(text) {
+  return text
+    .replace(/\r/g, "")
+    .split(/(?<=[。！？!?])\s*|\n+/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function extractParticipants(lines) {
+  return unique(lines
+    .map(line => line.match(/^([\u4e00-\u9fa5A-Za-z0-9_ -]{2,12})[：:]/))
+    .filter(Boolean)
+    .map(match => match[1].trim()));
+}
+
+function extractDue(text) {
+  const patterns = [
+    /((?:今天|明天|后天|本周|下周|周[一二三四五六日天]|星期[一二三四五六日天])(?:上午|下午|晚上)?\s*\d{0,2}\s*(?:点|:\d{2})?前?)/,
+    /(\d{1,2}\s*月\s*\d{1,2}\s*日(?:前)?)/,
+    /(\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:前)?)/
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1].replace(/\s+/g, "");
+  }
+  return "待确认";
+}
+
+function inferOwner(text, participants, fallback) {
+  const explicitPerson = text.match(/请?([\u4e00-\u9fa5A-Za-z]{2,4})(?:负责|跟进)/);
+  if (explicitPerson) return explicitPerson[1];
+  const department = text.match(/^(?:需要)?(产品|运营|客服|开发|技术|测试|设计)(?:团队|侧)?/);
+  if (department) return department[1];
+  const namedBeforeTask = text.match(/^([\u4e00-\u9fa5A-Za-z]{2,4})(?:今天|明天|后天|本周|下周|周[一二三四五六日天]|星期[一二三四五六日天]|\s|\d|点|前)*(?:负责|跟进|完成|确认|更新|整理|提交|同步|给出)/);
+  if (namedBeforeTask && participants.includes(namedBeforeTask[1])) return namedBeforeTask[1];
+  return participants.find(name => text.includes(name)) || fallback || "待分配";
+}
+
+function summarizeLocal(title, transcript) {
+  const rawLines = transcript.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const participants = extractParticipants(rawLines);
+  const contentLines = rawLines.map(line => line.replace(/^([\u4e00-\u9fa5A-Za-z0-9_ -]{2,12})[：:]\s*/, ""));
+  const sentences = splitSentences(contentLines.join("\n"));
+
+  const decisionKeywords = /(决定|确定|结论|同意|采用|保留|不叠加|灰度上线|扩大流量)/;
+  const actionKeywords = /(负责|需要|请|完成|提交|确认|更新|整理|同步|安排|跟进|检查|给出)/;
+  const riskKeywords = /(风险|阻塞|延后|延期|上线窗口.*紧|卡在|不足|低于|比目标低|下降|缺少|失败)/;
+
+  const decisions = unique(sentences.filter(sentence => decisionKeywords.test(sentence))).slice(0, 6);
+  const risks = unique(sentences.filter(sentence => riskKeywords.test(sentence))).slice(0, 5);
+  const actionSentences = unique(sentences.flatMap(sentence => {
+    if (!actionKeywords.test(sentence)) return [];
+    return sentence
+      .split(/[，,；;]/)
+      .map(item => item.trim())
+      .filter(item => !/^(如果|若|风险是|否则)/.test(item))
+      .filter(item => actionKeywords.test(item) || /^(产品|运营|客服|开发|技术|测试|设计).*(前|完成|确认|更新|整理|同步|给出)/.test(item));
+  })).slice(0, 8);
+
+  const actionItems = actionSentences.map((sentence, index) => {
+    const raw = rawLines.find(line => line.includes(sentence.slice(0, Math.min(12, sentence.length)))) || "";
+    const speaker = raw.match(/^([\u4e00-\u9fa5A-Za-z0-9_ -]{2,12})[：:]/)?.[1];
+    return {
+      id: index + 1,
+      owner: inferOwner(sentence, participants, speaker),
+      task: sentence.replace(/^(请|需要)/, ""),
+      due: extractDue(sentence),
+      status: sentence.includes("完成") ? "进行中" : "待开始"
+    };
+  });
+
+  const keywordPool = contentLines.join(" ");
+  const topics = unique((keywordPool.match(/(转化率|客服|FAQ|知识库|活动页|埋点|上线|灰度|套餐|文案|咨询量|运营)/g) || [])).slice(0, 8);
+  const highlights = sentences.filter(sentence => /(目标|主要|建议|结论|决定|风险|数据|咨询)/.test(sentence)).slice(0, 5);
+
+  return {
+    source: "browser-fallback",
+    title: title || "会议纪要",
+    summary: [
+      `${title || "本次会议"}围绕${topics.slice(0, 3).join("、") || "业务推进"}展开，重点讨论现状问题、处理方案和上线安排。`,
+      highlights[0] || "会议已形成主要结论，并拆分出后续负责人和截止时间。",
+      risks[0] ? `当前主要风险：${risks[0]}` : "当前未识别到明显阻塞，后续需按任务清单推进。"
+    ],
+    participants,
+    topics,
+    decisions: decisions.length ? decisions : ["暂未识别到明确决策，建议补充会议结论。"],
+    actionItems: actionItems.length ? actionItems : [{
+      id: 1,
+      owner: "待分配",
+      task: "补充会议结论、责任人和截止时间",
+      due: "待确认",
+      status: "待开始"
+    }],
+    risks: risks.length ? risks : ["暂未发现明显风险。"],
+    timeline: [
+      "采集会议转写文本并识别参会角色",
+      "提炼议题、结论、风险和责任事项",
+      "生成可复制纪要并支持上下文追问"
+    ],
+    followUpHints: [
+      "本次会议有哪些明确决策？",
+      "谁需要在什么时候完成什么？",
+      "当前最大的上线风险是什么？"
+    ]
+  };
+}
+
+function buildAnswer(question, minutes) {
+  const q = question.trim();
+  if (!q) return "请先输入一个追问问题。";
+  if (/决策|结论|决定/.test(q)) return minutes.decisions.map(item => `- ${item}`).join("\n");
+  if (/待办|任务|谁|负责|截止|什么时候/.test(q)) {
+    return minutes.actionItems.map(item => `- ${item.owner}：${item.task}（${item.due}，${item.status}）`).join("\n");
+  }
+  if (/风险|问题|阻塞|延期/.test(q)) return minutes.risks.map(item => `- ${item}`).join("\n");
+  if (/参会|人员|谁参加/.test(q)) return minutes.participants.length ? minutes.participants.join("、") : "未识别到参会人。";
+  return [
+    "可参考本次会议纪要：",
+    ...minutes.summary.map(item => `- ${item}`),
+    "你也可以继续追问“决策”“待办”“风险”或“参会人”。"
+  ].join("\n");
+}
+
+function showToast(message) {
+  const toast = $("#toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  window.clearTimeout(state.toastTimer);
+  state.toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3200);
+}
 
 function setLoading(isLoading) {
   $("#generateButton").disabled = isLoading;
@@ -34,23 +170,62 @@ function listItems(target, items) {
   });
 }
 
+function renderChips(target, items) {
+  const node = $(target);
+  node.innerHTML = "";
+  if (!items || !items.length) {
+    const span = document.createElement("span");
+    span.className = "empty";
+    span.textContent = "暂无标签";
+    node.appendChild(span);
+    return;
+  }
+  items.forEach(item => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = item;
+    node.appendChild(chip);
+  });
+}
+
+function renderTimeline(items) {
+  const node = $("#timelineList");
+  node.innerHTML = "";
+  (items || []).forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    node.appendChild(li);
+  });
+}
+
+function setMetrics(minutes) {
+  $("#participantCount").textContent = String((minutes.participants || []).length);
+  $("#decisionCount").textContent = String((minutes.decisions || []).length);
+  $("#actionCount").textContent = String((minutes.actionItems || []).length);
+  $("#riskCount").textContent = String((minutes.risks || []).length);
+}
+
 function renderMinutes(minutes) {
   state.minutes = minutes;
   $("#resultTitle").textContent = minutes.title || "结构化纪要";
-  $("#resultMeta").textContent = `参会人：${(minutes.participants || []).join("、") || "未识别"} · 引擎：${minutes.source === "llm-api" ? "LLM API" : "本地演示"}`;
-  $("#engineStatus").textContent = minutes.source === "llm-api" ? "LLM API 已启用" : "本地演示引擎";
+  const engineName = minutes.source === "llm-api" ? "LLM API" : minutes.source === "browser-fallback" ? "浏览器本地兜底" : "本地演示";
+  $("#resultMeta").textContent = `参会人：${(minutes.participants || []).join("、") || "未识别"} · 引擎：${engineName}`;
+  $("#engineStatus").textContent = engineName;
+  setMetrics(minutes);
 
   const summary = $("#summaryList");
   summary.innerHTML = "";
-  (minutes.summary || []).slice(0, 3).forEach(item => {
+  (minutes.summary || []).slice(0, 3).forEach((item, index) => {
     const div = document.createElement("div");
     div.className = "summary-card";
-    div.textContent = item;
+    div.textContent = `${["摘要", "证据", "风险"][index] || "洞察"}：${item}`;
     summary.appendChild(div);
   });
 
   listItems("#decisionList", minutes.decisions || []);
   listItems("#riskList", minutes.risks || []);
+  renderChips("#topicList", minutes.topics || []);
+  renderTimeline(minutes.timeline || []);
 
   const table = $("#actionTable");
   table.innerHTML = "";
@@ -81,33 +256,44 @@ function renderMinutes(minutes) {
 
 function renderInitial() {
   $("#transcriptInput").value = sampleText;
-  $("#summaryList").innerHTML = `<div class="summary-card">粘贴会议转写文本后，系统会自动提炼摘要。</div><div class="summary-card">识别关键决策、待办事项和风险。</div><div class="summary-card">支持基于纪要内容继续追问。</div>`;
+  $("#summaryList").innerHTML = `<div class="summary-card">摘要：粘贴会议转写文本后，系统会自动提炼执行摘要。</div><div class="summary-card">证据：识别关键决策、待办事项和风险来源。</div><div class="summary-card">风险：支持基于纪要内容继续追问。</div>`;
   listItems("#decisionList", ["等待生成"]);
   listItems("#riskList", ["等待生成"]);
+  renderChips("#topicList", ["运营", "上线", "客服", "FAQ"]);
+  renderTimeline(["输入会议转写文本", "生成结构化纪要", "复制纪要或继续追问"]);
   $("#actionTable").innerHTML = `<tr><td class="empty" colspan="4">等待生成待办事项</td></tr>`;
+}
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json") ? await response.json() : { error: await response.text() };
+  if (!response.ok) throw new Error(payload.error || "请求失败");
+  return payload;
 }
 
 async function generateMinutes() {
   const title = $("#titleInput").value.trim();
   const transcript = $("#transcriptInput").value.trim();
   if (transcript.length < 20) {
-    alert("请先输入至少 20 个字符的会议转写文本。");
+    showToast("请先输入至少 20 个字符的会议转写文本。");
     return;
   }
 
   setLoading(true);
   $("#answerBox").textContent = "";
   try {
-    const response = await fetch("/api/minutes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, transcript })
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "生成失败");
+    const payload = await postJson("/api/minutes", { title, transcript });
     renderMinutes(payload.minutes);
+    showToast("纪要已生成。");
   } catch (error) {
-    alert(error.message);
+    const minutes = summarizeLocal(title, transcript);
+    renderMinutes(minutes);
+    showToast("后端 API 暂不可用，已自动切换到浏览器本地兜底。");
   } finally {
     setLoading(false);
   }
@@ -115,7 +301,7 @@ async function generateMinutes() {
 
 async function askQuestion() {
   if (!state.minutes) {
-    alert("请先生成纪要。");
+    showToast("请先生成纪要。");
     return;
   }
 
@@ -124,21 +310,19 @@ async function askQuestion() {
 
   $("#answerBox").textContent = "思考中...";
   try {
-    const response = await fetch("/api/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, minutes: state.minutes })
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "追问失败");
+    const payload = await postJson("/api/ask", { question, minutes: state.minutes });
     $("#answerBox").textContent = payload.answer;
   } catch (error) {
-    $("#answerBox").textContent = error.message;
+    $("#answerBox").textContent = buildAnswer(question, state.minutes);
+    showToast("追问接口暂不可用，已使用本地纪要上下文回答。");
   }
 }
 
 function copyMinutes() {
-  if (!state.minutes) return;
+  if (!state.minutes) {
+    showToast("暂无可复制纪要，请先生成。");
+    return;
+  }
   const minutes = state.minutes;
   const text = [
     `# ${minutes.title}`,
@@ -156,6 +340,7 @@ function copyMinutes() {
     ...(minutes.risks || []).map(item => `- ${item}`)
   ].join("\n");
   navigator.clipboard.writeText(text);
+  showToast("纪要已复制。");
 }
 
 $("#generateButton").addEventListener("click", generateMinutes);
@@ -163,11 +348,13 @@ $("#askButton").addEventListener("click", askQuestion);
 $("#copyButton").addEventListener("click", copyMinutes);
 $("#loadSampleButton").addEventListener("click", () => {
   $("#transcriptInput").value = sampleText;
+  showToast("示例会议已载入。");
 });
 $("#fileInput").addEventListener("change", async event => {
   const [file] = event.target.files;
   if (!file) return;
   $("#transcriptInput").value = await file.text();
+  showToast("文本已导入。");
 });
 $("#questionInput").addEventListener("keydown", event => {
   if (event.key === "Enter") askQuestion();
