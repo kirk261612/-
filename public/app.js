@@ -150,7 +150,9 @@ function showToast(message) {
 
 function setLoading(isLoading) {
   $("#generateButton").disabled = isLoading;
+  $("#generateButtonSecondary").disabled = isLoading;
   $("#generateButton").textContent = isLoading ? "生成中..." : "生成纪要";
+  $("#generateButtonSecondary").textContent = isLoading ? "生成中..." : "生成纪要";
 }
 
 function listItems(target, items) {
@@ -344,6 +346,7 @@ function copyMinutes() {
 }
 
 $("#generateButton").addEventListener("click", generateMinutes);
+$("#generateButtonSecondary").addEventListener("click", generateMinutes);
 $("#askButton").addEventListener("click", askQuestion);
 $("#copyButton").addEventListener("click", copyMinutes);
 $("#loadSampleButton").addEventListener("click", () => {

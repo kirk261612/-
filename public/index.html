@@ -4,163 +4,195 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="styles.css?v=4">
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
-        <div class="brand">
+      <aside class="rail" aria-label="产品导航">
+        <div class="rail-brand">
           <div class="brand-mark" aria-hidden="true">M</div>
           <div>
-            <h1>会速记 AI Workbench</h1>
-            <p>会议转写 · 决策识别 · 待办追踪 · 纪要追问</p>
+            <strong>会速记</strong>
+            <span>AI Ops Minutes</span>
           </div>
         </div>
-        <div class="top-actions">
-          <span class="status-dot" aria-hidden="true"></span>
-          <div class="status" id="engineStatus">本地演示可用</div>
-          <button class="ghost-button" id="copyButton">复制纪要</button>
-        </div>
-      </header>
 
-      <main class="workspace">
-        <aside class="input-pane" aria-label="会议输入区">
-          <div class="pane-head">
-            <div>
-              <span class="eyebrow">Meeting Source</span>
-              <h2>会议内容</h2>
+        <nav class="rail-nav" aria-label="功能模块">
+          <a class="nav-item active" href="#workspace">
+            <span class="nav-icon">◆</span>
+            智能纪要
+          </a>
+          <a class="nav-item" href="#actions">
+            <span class="nav-icon">□</span>
+            待办追踪
+          </a>
+          <a class="nav-item" href="#ask">
+            <span class="nav-icon">◐</span>
+            纪要追问
+          </a>
+        </nav>
+
+        <div class="rail-card">
+          <span class="eyebrow">Runtime</span>
+          <strong id="engineStatus">本地演示可用</strong>
+          <p>API 不可用时自动降级到浏览器本地引擎。</p>
+        </div>
+      </aside>
+
+      <main class="main" id="workspace">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">AI Meeting Command Center</span>
+            <h1>会议纪要智能工作台</h1>
+            <p>把口语化会议转写变成可追踪的决策、风险和责任清单。</p>
+          </div>
+          <div class="top-actions">
+            <button class="ghost-button" id="copyButton">复制纪要</button>
+            <button class="primary-button top-generate" id="generateButton">生成纪要</button>
+          </div>
+        </header>
+
+        <section class="overview" aria-label="工作台概览">
+          <div class="overview-card lead">
+            <span class="eyebrow">Executive Brief</span>
+            <h2 id="resultTitle">结构化纪要</h2>
+            <p id="resultMeta">生成后将展示摘要、决策、待办和风险。</p>
+          </div>
+          <div class="metric">
+            <span>参会人</span>
+            <strong id="participantCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>关键决策</span>
+            <strong id="decisionCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>待办事项</span>
+            <strong id="actionCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>风险提醒</span>
+            <strong id="riskCount">0</strong>
+          </div>
+        </section>
+
+        <div class="work-grid">
+          <section class="input-pane panel" aria-label="会议输入区">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Source Material</span>
+                <h2>会议内容</h2>
+              </div>
+              <button class="icon-button" id="loadSampleButton" title="载入示例" aria-label="载入示例">↺</button>
             </div>
-            <button class="icon-button" id="loadSampleButton" title="载入示例" aria-label="载入示例">↺</button>
-          </div>
 
-          <label class="field">
-            <span>会议标题</span>
-            <input id="titleInput" type="text" value="7 月运营活动复盘会" placeholder="输入会议标题">
-          </label>
-
-          <label class="field transcript-field">
-            <span>转写文本</span>
-            <textarea id="transcriptInput" placeholder="粘贴会议转写文本，或上传 .txt 文件"></textarea>
-          </label>
-
-          <div class="upload-row">
-            <label class="file-control">
-              <input id="fileInput" type="file" accept=".txt,text/plain">
-              上传文本
+            <label class="field">
+              <span>会议标题</span>
+              <input id="titleInput" type="text" value="7 月运营活动复盘会" placeholder="输入会议标题">
             </label>
-            <button class="primary-button" id="generateButton">生成纪要</button>
-          </div>
 
-          <div class="source-note" id="sourceNote">
-            <strong>处理模式</strong>
-            <span>优先调用后端 API；如果接口不可用，页面会自动切换到本地演示引擎。</span>
-          </div>
-        </aside>
+            <label class="field transcript-field">
+              <span>转写文本</span>
+              <textarea id="transcriptInput" placeholder="粘贴会议转写文本，或上传 .txt 文件"></textarea>
+            </label>
 
-        <section class="result-pane" aria-label="结果展示区">
-          <div class="result-hero">
-            <div>
-              <span class="eyebrow">AI Minutes Intelligence</span>
-              <h2 id="resultTitle">结构化纪要</h2>
-              <p id="resultMeta">生成后将展示摘要、决策、待办和风险。</p>
+            <div class="upload-row">
+              <label class="file-control">
+                <input id="fileInput" type="file" accept=".txt,text/plain">
+                上传文本
+              </label>
+              <button class="secondary-button" id="generateButtonSecondary">生成纪要</button>
             </div>
-            <div class="hero-chip">Executive Brief</div>
-          </div>
 
-          <div class="metric-grid" aria-label="纪要指标">
-            <div class="metric">
-              <span>参会人</span>
-              <strong id="participantCount">0</strong>
+            <div class="source-note" id="sourceNote">
+              <strong>处理模式</strong>
+              <span>优先调用后端 API；如果接口不可用，页面会自动切换到本地演示引擎。</span>
             </div>
-            <div class="metric">
-              <span>关键决策</span>
-              <strong id="decisionCount">0</strong>
-            </div>
-            <div class="metric">
-              <span>待办事项</span>
-              <strong id="actionCount">0</strong>
-            </div>
-            <div class="metric">
-              <span>风险提醒</span>
-              <strong id="riskCount">0</strong>
-            </div>
-          </div>
+          </section>
 
-          <div class="summary-band" id="summaryList"></div>
+          <section class="analysis-pane" aria-label="纪要洞察区">
+            <div class="summary-band" id="summaryList"></div>
 
-          <div class="insight-grid">
-            <article class="panel">
-              <div class="panel-title">
-                <h3>关键决策</h3>
-                <span class="panel-tag">Decision</span>
+            <div class="insight-grid">
+              <article class="panel">
+                <div class="panel-head compact">
+                  <h3>关键决策</h3>
+                  <span class="panel-tag">Decision</span>
+                </div>
+                <ul id="decisionList"></ul>
+              </article>
+              <article class="panel">
+                <div class="panel-head compact">
+                  <h3>风险提醒</h3>
+                  <span class="panel-tag danger">Risk</span>
+                </div>
+                <ul id="riskList"></ul>
+              </article>
+            </div>
+
+            <article class="panel wide" id="actions">
+              <div class="panel-head compact">
+                <h3>待办事项</h3>
+                <span class="panel-tag">Action Tracker</span>
               </div>
-              <ul id="decisionList"></ul>
-            </article>
-            <article class="panel">
-              <div class="panel-title">
-                <h3>风险提醒</h3>
-                <span class="panel-tag danger">Risk</span>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>负责人</th>
+                      <th>任务</th>
+                      <th>截止时间</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody id="actionTable"></tbody>
+                </table>
               </div>
-              <ul id="riskList"></ul>
-            </article>
-          </div>
-
-          <article class="panel wide">
-            <div class="panel-title">
-              <h3>待办事项</h3>
-              <span class="panel-tag">Action Tracker</span>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>负责人</th>
-                    <th>任务</th>
-                    <th>截止时间</th>
-                    <th>状态</th>
-                  </tr>
-                </thead>
-                <tbody id="actionTable"></tbody>
-              </table>
-            </div>
-          </article>
-
-          <div class="bottom-grid">
-            <article class="panel">
-              <div class="panel-title">
-                <h3>议题标签</h3>
-                <span class="panel-tag">Topics</span>
-              </div>
-              <div class="chips" id="topicList"></div>
             </article>
 
-            <article class="panel">
-              <div class="panel-title">
-                <h3>处理流程</h3>
-                <span class="panel-tag">Workflow</span>
-              </div>
-              <ol class="timeline" id="timelineList"></ol>
-            </article>
-          </div>
+            <div class="bottom-grid">
+              <article class="panel">
+                <div class="panel-head compact">
+                  <h3>议题标签</h3>
+                  <span class="panel-tag">Topics</span>
+                </div>
+                <div class="chips" id="topicList"></div>
+              </article>
 
-          <article class="panel ask-panel">
-            <div class="panel-title">
-              <h3>纪要追问</h3>
-              <span class="panel-tag">Q&A</span>
+              <article class="panel">
+                <div class="panel-head compact">
+                  <h3>处理流程</h3>
+                  <span class="panel-tag">Workflow</span>
+                </div>
+                <ol class="timeline" id="timelineList"></ol>
+              </article>
             </div>
-            <div class="chips" id="hintList"></div>
+          </section>
+
+          <aside class="assistant-pane panel" id="ask" aria-label="纪要追问区">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Context Q&A</span>
+                <h2>纪要追问</h2>
+              </div>
+              <span class="live-badge">Ready</span>
+            </div>
+
+            <div class="chips hint-chips" id="hintList"></div>
+
             <div class="ask-row">
               <input id="questionInput" type="text" placeholder="例如：本次会议最大的风险是什么？">
               <button class="primary-button" id="askButton">追问</button>
             </div>
+
             <pre id="answerBox"></pre>
-          </article>
-        </section>
+          </aside>
+        </div>
       </main>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="/app.js"></script>
+    <script src="app.js?v=4"></script>
   </body>
 </html>
