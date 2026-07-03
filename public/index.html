@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=9">
   </head>
   <body>
     <header class="store-nav">
@@ -14,6 +14,7 @@
       </a>
       <nav class="store-links" aria-label="主导航">
         <a class="nav-item active" href="#dashboard" data-view-target="dashboard">总览</a>
+        <a class="nav-item" href="#intro" data-view-target="intro">介绍</a>
         <a class="nav-item" href="#intelligence" data-view-target="intelligence">洞察</a>
         <a class="nav-item" href="#actions" data-view-target="actions">待办</a>
         <a class="nav-item" href="#ask" data-view-target="ask">追问</a>
@@ -105,6 +106,10 @@
                 <strong>智能洞察</strong>
                 <span>评分、发言人贡献、转写统计</span>
               </button>
+              <button class="module-card" data-view-target="intro">
+                <strong>产品介绍</strong>
+                <span>滚动叙事展示核心能力</span>
+              </button>
               <button class="module-card" data-view-target="actions">
                 <strong>待办中心</strong>
                 <span>决策、风险、责任事项</span>
@@ -113,13 +118,69 @@
                 <strong>纪要追问</strong>
                 <span>基于纪要上下文问答</span>
               </button>
-              <button class="module-card" data-view-target="subscription">
-                <strong>订阅方案</strong>
-                <span>团队协作和企业级能力</span>
-              </button>
             </div>
           </section>
         </div>
+      </section>
+
+      <section class="view" id="introView" data-view="intro" aria-label="产品介绍">
+        <section class="feature-showcase" data-scene="0">
+          <div class="showcase-stage" aria-hidden="true">
+            <div class="aura-ring"></div>
+            <div class="device-shadow"></div>
+            <div class="device-shell">
+              <div class="device-bar"></div>
+              <div class="device-screen">
+                <div class="screen-header">
+                  <span></span>
+                  <strong>会速记</strong>
+                  <span></span>
+                </div>
+                <div class="screen-panel screen-summary">
+                  <p>Executive Brief</p>
+                  <strong>7 月运营活动复盘会</strong>
+                  <small>摘要、决策、风险已提炼</small>
+                </div>
+                <div class="screen-panel screen-score">
+                  <p>AI Score</p>
+                  <strong>96</strong>
+                  <small>高质量纪要</small>
+                </div>
+                <div class="screen-list">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </div>
+            <div class="feature-orbit orbit-a">摘要</div>
+            <div class="feature-orbit orbit-b">决策</div>
+            <div class="feature-orbit orbit-c">待办</div>
+          </div>
+
+          <div class="story-track">
+            <section class="story-step" data-scene-step="0">
+              <p class="eyebrow">Capture</p>
+              <h2>把一整场会议，收进一个清晰入口。</h2>
+              <p>粘贴转写文本或上传文件，系统自动识别参会人、议题、结论和风险来源。</p>
+            </section>
+            <section class="story-step" data-scene-step="1">
+              <p class="eyebrow">Structure</p>
+              <h2>自动拆成摘要、决策和责任事项。</h2>
+              <p>不再从大段文字里找重点，纪要会被整理成可复制、可追问、可交付的结构化结果。</p>
+            </section>
+            <section class="story-step" data-scene-step="2">
+              <p class="eyebrow">Insight</p>
+              <h2>会议质量和发言贡献，顺手就看见。</h2>
+              <p>系统根据决策数量、待办完整度、风险和发言覆盖度给出评分与下一步建议。</p>
+            </section>
+            <section class="story-step" data-scene-step="3">
+              <p class="eyebrow">Action</p>
+              <h2>会后推进，不再散落在聊天记录里。</h2>
+              <p>责任人、任务、截止时间和状态集中展示，可以继续筛选、追问或导出到协作工具。</p>
+            </section>
+          </div>
+        </section>
       </section>
 
       <section class="view" id="intelligenceView" data-view="intelligence" aria-label="智能洞察">
@@ -307,6 +368,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
   </body>
 </html>

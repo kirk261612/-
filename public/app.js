@@ -23,6 +23,10 @@ const viewMeta = {
     title: "会议纪要中枢",
     subtitle: "首页只保留生成和总览，深度能力拆分到独立页面。"
   },
+  intro: {
+    title: "产品介绍",
+    subtitle: "像浏览一款新设备一样，向下滑动查看会速记的核心能力。"
+  },
   intelligence: {
     title: "智能洞察",
     subtitle: "查看会议质量评分、发言人贡献、议题标签和转写统计。"
@@ -267,6 +271,7 @@ function setView(view) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   queueRevealRefresh();
+  window.requestAnimationFrame(updateIntroShowcase);
 }
 
 function getRevealNodes(root = document) {
@@ -282,9 +287,39 @@ function getRevealNodes(root = document) {
       .chip,
       .stat-item,
       .speaker-row,
+      .story-step,
       table tr
     `)
   ];
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function updateIntroShowcase() {
+  const showcase = document.querySelector(".feature-showcase");
+  if (!showcase || state.currentView !== "intro") return;
+
+  const rect = showcase.getBoundingClientRect();
+  const travel = Math.max(1, rect.height - window.innerHeight);
+  const progress = clamp((-rect.top / travel) * 100, 0, 100);
+  showcase.style.setProperty("--scene-progress", progress.toFixed(2));
+
+  const viewportFocus = window.innerHeight * 0.52;
+  const steps = [...showcase.querySelectorAll(".story-step")];
+  let activeIndex = 0;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  steps.forEach((step, index) => {
+    const stepRect = step.getBoundingClientRect();
+    const distance = Math.abs((stepRect.top + stepRect.height * 0.45) - viewportFocus);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      activeIndex = index;
+    }
+  });
+  showcase.dataset.scene = String(activeIndex);
+  steps.forEach((step, index) => step.classList.toggle("is-current", index === activeIndex));
 }
 
 function isElementInRevealRange(node) {
@@ -341,6 +376,7 @@ function initScrollMotion() {
   const updateNavState = () => {
     document.body.classList.toggle("scrolled", window.scrollY > 12);
     revealVisibleNow(document.querySelector(".view.active") || document);
+    updateIntroShowcase();
   };
   updateNavState();
   window.addEventListener("scroll", updateNavState, { passive: true });
