@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="styles.css?v=20">
   </head>
   <body>
     <header class="store-nav">
@@ -14,16 +14,19 @@
       </a>
       <nav class="store-links" aria-label="主导航">
         <a class="nav-item active" href="#intro" data-view-target="intro">介绍</a>
+        <button class="nav-item mobile-auth-link" id="mobileLoginButton" type="button">登录</button>
         <a class="nav-item" href="#dashboard" data-view-target="dashboard">功能</a>
         <a class="nav-item" href="#intelligence" data-view-target="intelligence">洞察</a>
         <a class="nav-item" href="#actions" data-view-target="actions">待办</a>
         <a class="nav-item" href="#ask" data-view-target="ask">追问</a>
+        <a class="nav-item" href="#notes" data-view-target="notes">笔记</a>
         <a class="nav-item" href="#export" data-view-target="export">导出</a>
         <a class="nav-item" href="#subscription" data-view-target="subscription">订阅</a>
       </nav>
       <div class="nav-actions">
         <span class="runtime-pill" id="engineStatus">本地演示可用</span>
-        <button class="primary-button compact" id="generateButton">生成纪要</button>
+        <button class="ghost-button compact login-entry" id="loginButton" type="button">登录</button>
+        <button class="primary-button compact" id="generateButton" type="button">生成纪要</button>
       </div>
     </header>
 
@@ -35,7 +38,6 @@
           <p>会速记从转写文本中提炼摘要、决策、风险和责任事项，再把结果送进知识库、待办系统、客服 FAQ 和周报交付链路。</p>
           <div class="landing-actions">
             <button class="primary-button" data-view-target="dashboard">打开功能页</button>
-            <button class="ghost-button" data-scroll-target=".feature-showcase">查看滚动演示</button>
           </div>
         </div>
         <div class="landing-product" aria-label="产品功能预览">
@@ -251,9 +253,9 @@
                 <strong>智能洞察</strong>
                 <span>评分、发言人贡献、转写统计</span>
               </button>
-              <button class="module-card" data-view-target="intro">
-                <strong>产品介绍</strong>
-                <span>滚动叙事展示核心能力</span>
+              <button class="module-card" data-view-target="notes">
+                <strong>笔记整理</strong>
+                <span>整理零散内容并生成 PPT</span>
               </button>
               <button class="module-card" data-view-target="actions">
                 <strong>待办中心</strong>
@@ -546,6 +548,56 @@
         </article>
       </section>
 
+      <section class="view" id="notesView" data-view="notes" aria-label="笔记整理">
+        <div class="notes-heading">
+          <div>
+            <span class="eyebrow">AI Notes Studio</span>
+            <h2>把零散内容整理成可以继续工作的笔记。</h2>
+          </div>
+          <span class="panel-tag">Notes to Slides</span>
+        </div>
+        <div class="notes-workspace">
+          <section class="panel notes-editor" aria-label="笔记输入">
+            <label class="field">
+              <span>笔记标题</span>
+              <input id="noteTitleInput" type="text" value="项目会议整理" placeholder="输入笔记标题">
+            </label>
+            <label class="field notes-source">
+              <span>原始内容</span>
+              <textarea id="noteInput" placeholder="粘贴会议记录、灵感、访谈内容或工作草稿"></textarea>
+            </label>
+            <div class="notes-actions">
+              <button class="ghost-button" id="loadMinutesToNotesButton" type="button">导入当前纪要</button>
+              <button class="primary-button" id="organizeNotesButton" type="button">智能整理</button>
+            </div>
+          </section>
+          <section class="panel notes-result" aria-label="整理结果">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Organized Output</span>
+                <h2 id="organizedNoteTitle">等待整理</h2>
+              </div>
+              <button class="primary-button" id="generatePptButton" type="button" disabled>生成 PPT</button>
+            </div>
+            <p class="notes-summary" id="organizedSummary">整理后将自动生成摘要、重点、行动项和演示文稿结构。</p>
+            <div class="organized-grid">
+              <div>
+                <span class="result-label">核心重点</span>
+                <ul id="organizedHighlights"><li class="empty">暂无内容</li></ul>
+              </div>
+              <div>
+                <span class="result-label">行动事项</span>
+                <ul id="organizedActions"><li class="empty">暂无内容</li></ul>
+              </div>
+            </div>
+            <div class="slide-outline" id="slideOutline">
+              <span class="result-label">PPT 结构</span>
+              <p>完成整理后显示建议页结构。</p>
+            </div>
+          </section>
+        </div>
+      </section>
+
       <section class="view" id="exportView" data-view="export" aria-label="交付导出">
         <article class="panel export-page" id="export">
           <div class="panel-head">
@@ -568,50 +620,140 @@
 
       <section class="view" id="subscriptionView" data-view="subscription" aria-label="订阅方案">
         <div class="subscription-hero">
-          <p class="eyebrow">Subscription</p>
-          <h2>会速记订阅</h2>
-          <p>覆盖个人整理、团队协作和企业知识管理。</p>
+          <p class="eyebrow">Choose Your Plan</p>
+          <h2>先订阅，再开始工作。</h2>
+          <p>所有 AI 生成、洞察、追问、笔记整理和导出功能均需要有效订阅。按使用强度和协作规模选择方案。</p>
+          <div class="subscription-status" id="subscriptionStatus">当前未订阅</div>
         </div>
         <div class="plans">
-          <article class="plan-card">
-            <span class="plan-label">Starter</span>
-            <h3>个人版</h3>
-            <p class="price">¥0<span>/月</span></p>
-            <ul>
-              <li>本地演示引擎</li>
-              <li>会议纪要生成</li>
-              <li>Markdown 导出</li>
+          <article class="plan-card" data-plan-card="personal">
+            <span class="plan-label">Personal</span>
+            <h3>个人效率版</h3>
+            <p class="price">¥29<span>/月</span></p>
+            <p class="plan-for">适合个人会议、学习笔记和轻量输出</p>
+            <ul class="plan-features">
+              <li><strong>30 次</strong> AI 纪要或笔记整理/月</li>
+              <li>结构化纪要、待办和基础追问</li>
+              <li>Markdown / JSON 导出</li>
+              <li><strong>5 份</strong> PPT 生成/月</li>
             </ul>
-            <button class="ghost-button">当前方案</button>
+            <button class="ghost-button plan-select" data-plan-id="personal" type="button">选择个人版</button>
           </article>
-          <article class="plan-card featured">
+          <article class="plan-card featured" data-plan-card="pro">
             <span class="plan-label">Most Popular</span>
-            <h3>团队版</h3>
-            <p class="price">¥39<span>/人/月</span></p>
-            <ul>
-              <li>LLM API 增强生成</li>
-              <li>待办协作追踪</li>
-              <li>团队模板和批量导出</li>
+            <h3>专业创作版</h3>
+            <p class="price">¥69<span>/月</span></p>
+            <p class="plan-for">适合高频会议、深度整理和演示交付</p>
+            <ul class="plan-features">
+              <li><strong>不限次数</strong> AI 纪要与笔记整理</li>
+              <li>高级洞察、多轮追问和自定义模板</li>
+              <li>全部导出格式与批量处理</li>
+              <li><strong>不限份数</strong> PPT 生成</li>
             </ul>
-            <button class="primary-button">升级团队版</button>
+            <button class="primary-button plan-select" data-plan-id="pro" type="button">选择专业版</button>
           </article>
-          <article class="plan-card">
-            <span class="plan-label">Enterprise</span>
-            <h3>企业版</h3>
-            <p class="price">定制<span>/年</span></p>
-            <ul>
-              <li>私有化部署</li>
-              <li>知识库/RAG 扩展</li>
-              <li>SSO、审计和权限管理</li>
+          <article class="plan-card" data-plan-card="team">
+            <span class="plan-label">Team</span>
+            <h3>团队协作版</h3>
+            <p class="price">¥129<span>/人/月</span></p>
+            <p class="plan-for">适合项目组、运营团队和企业知识沉淀</p>
+            <ul class="plan-features">
+              <li>包含专业版全部能力</li>
+              <li>共享空间、团队模板和协作待办</li>
+              <li>成员权限、操作审计和集中管理</li>
+              <li>API 接入、优先支持和品牌 PPT</li>
             </ul>
-            <button class="ghost-button">联系咨询</button>
+            <button class="ghost-button plan-select" data-plan-id="team" type="button">选择团队版</button>
           </article>
+        </div>
+      </section>
+
+      <section class="view" id="paymentView" data-view="payment" aria-label="支付">
+        <div class="payment-heading">
+          <button class="ghost-button" data-view-target="subscription" type="button">返回套餐</button>
+          <div>
+            <span class="eyebrow">Secure Checkout</span>
+            <h2>完成订阅支付</h2>
+          </div>
+        </div>
+        <div class="payment-layout">
+          <section class="panel order-summary" aria-label="订单信息">
+            <span class="panel-tag">订单摘要</span>
+            <h3 id="checkoutPlanName">专业创作版</h3>
+            <p id="checkoutPlanDescription">不限次数整理与 PPT 生成。</p>
+            <div class="checkout-price"><strong id="checkoutPrice">¥69</strong><span id="checkoutUnit">/月</span></div>
+            <ul id="checkoutFeatures"></ul>
+            <div class="secure-note">演示支付不会产生真实扣款。完成后会在本地保存订阅状态。</div>
+          </section>
+          <section class="panel payment-panel" aria-label="支付方式">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Payment Method</span>
+                <h2>选择支付方式</h2>
+              </div>
+              <span class="live-badge">Secure</span>
+            </div>
+            <div class="payment-methods" id="paymentMethods">
+              <button class="payment-method active" data-payment-method="wechat" type="button"><span class="pay-mark wechat">微</span>微信支付</button>
+              <button class="payment-method" data-payment-method="alipay" type="button"><span class="pay-mark alipay">支</span>支付宝</button>
+              <button class="payment-method" data-payment-method="visa" type="button"><span class="pay-mark visa">VISA</span>Visa</button>
+              <button class="payment-method" data-payment-method="mastercard" type="button"><span class="pay-mark mastercard">MC</span>Mastercard</button>
+              <button class="payment-method" data-payment-method="amex" type="button"><span class="pay-mark amex">AX</span>American Express</button>
+            </div>
+            <div class="wallet-payment" id="walletPayment">
+              <div class="payment-code" aria-hidden="true"></div>
+              <div>
+                <strong id="walletTitle">微信扫码支付</strong>
+                <p>打开对应 App 扫描二维码，或点击下方按钮完成演示支付。</p>
+              </div>
+            </div>
+            <div class="card-payment" id="cardPayment" hidden>
+              <label class="field"><span>持卡人姓名</span><input id="cardHolder" type="text" value="ZHANG MIN" autocomplete="cc-name"></label>
+              <label class="field"><span>卡号</span><input id="cardNumber" type="text" value="4242 4242 4242 4242" inputmode="numeric" autocomplete="cc-number"></label>
+              <div class="card-row">
+                <label class="field"><span>有效期</span><input id="cardExpiry" type="text" value="12/29" inputmode="numeric" autocomplete="cc-exp"></label>
+                <label class="field"><span>安全码</span><input id="cardCvc" type="password" value="123" inputmode="numeric" autocomplete="cc-csc"></label>
+              </div>
+            </div>
+            <button class="primary-button payment-confirm" id="confirmPaymentButton" type="button">确认支付 ¥69</button>
+          </section>
         </div>
       </section>
     </main>
 
+    <div class="auth-modal" id="authModal" aria-hidden="true">
+      <div class="auth-backdrop" data-auth-close></div>
+      <section class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <button class="icon-button auth-close" id="authCloseButton" type="button" aria-label="关闭登录面板">×</button>
+        <div class="auth-copy">
+          <span class="eyebrow">Account Access</span>
+          <h2 id="authTitle">登录会速记</h2>
+          <p id="authDescription">登录后可保存纪要草稿、同步团队模板，并在演示环境中体验协作入口。</p>
+        </div>
+        <form class="auth-form" id="authForm">
+          <label class="field">
+            <span>账号</span>
+            <input id="loginEmail" type="email" value="demo@minutes.ai" autocomplete="email" required>
+          </label>
+          <label class="field">
+            <span>密码</span>
+            <input id="loginPassword" type="password" value="123456" autocomplete="current-password" required>
+          </label>
+          <button class="primary-button" type="submit">进入工作台</button>
+        </form>
+        <div class="auth-profile" id="authProfile" hidden>
+          <div class="profile-avatar">M</div>
+          <div>
+            <strong id="profileName">演示用户</strong>
+            <span id="profileEmail">demo@minutes.ai</span>
+          </div>
+          <button class="ghost-button" id="logoutButton" type="button">退出登录</button>
+        </div>
+      </section>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=12"></script>
+    <script src="app.js?v=20"></script>
   </body>
 </html>

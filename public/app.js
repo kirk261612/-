@@ -13,10 +13,46 @@ const state = {
   lastTranscript: "",
   currentView: "intro",
   revealObserver: null,
-  lastScrollY: 0
+  lastScrollY: 0,
+  currentUser: null,
+  subscription: null,
+  selectedPlan: "pro",
+  paymentMethod: "wechat",
+  pendingView: null,
+  organizedNotes: null
 };
 
 const $ = selector => document.querySelector(selector);
+const authStorageKey = "meeting-minutes-user";
+const subscriptionStorageKey = "meeting-minutes-subscription";
+const protectedViews = new Set(["dashboard", "intelligence", "actions", "ask", "notes", "export"]);
+
+const subscriptionPlans = {
+  personal: {
+    id: "personal",
+    name: "个人效率版",
+    price: 29,
+    unit: "/月",
+    description: "适合个人会议、学习笔记和轻量输出。",
+    features: ["30 次 AI 纪要或笔记整理/月", "结构化纪要、待办和基础追问", "Markdown / JSON 导出", "5 份 PPT 生成/月"]
+  },
+  pro: {
+    id: "pro",
+    name: "专业创作版",
+    price: 69,
+    unit: "/月",
+    description: "适合高频会议、深度整理和演示交付。",
+    features: ["不限次数 AI 纪要与笔记整理", "高级洞察、多轮追问和自定义模板", "全部导出格式与批量处理", "不限份数 PPT 生成"]
+  },
+  team: {
+    id: "team",
+    name: "团队协作版",
+    price: 129,
+    unit: "/人/月",
+    description: "适合项目组、运营团队和企业知识沉淀。",
+    features: ["包含专业版全部能力", "共享空间、团队模板和协作待办", "成员权限、操作审计和集中管理", "API 接入、优先支持和品牌 PPT"]
+  }
+};
 
 const viewMeta = {
   dashboard: {
@@ -39,13 +75,21 @@ const viewMeta = {
     title: "纪要追问",
     subtitle: "基于当前结构化纪要继续提问，快速定位结论和风险。"
   },
+  notes: {
+    title: "笔记整理",
+    subtitle: "把零散记录整理为摘要、重点、行动项，并生成可下载的演示文稿。"
+  },
   export: {
     title: "交付导出",
     subtitle: "复制或导出 Markdown / JSON，用于周报、邮件和任务系统。"
   },
   subscription: {
     title: "订阅方案",
-    subtitle: "为个人、团队和企业选择不同级别的 AI 会议效率能力。"
+    subtitle: "所有工作模式都需要订阅，不同方案对应不同额度、协作范围与 PPT 权益。"
+  },
+  payment: {
+    title: "支付订阅",
+    subtitle: "选择微信、支付宝或国际信用卡完成订阅。"
   }
 };
 
@@ -255,8 +299,214 @@ function showToast(message) {
   state.toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
-function setView(view) {
-  const nextView = viewMeta[view] ? view : "dashboard";
+function loadSavedUser() {
+  try {
+    const saved = window.localStorage.getItem(authStorageKey);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUser(user) {
+  try {
+    if (user) window.localStorage.setItem(authStorageKey, JSON.stringify(user));
+    else window.localStorage.removeItem(authStorageKey);
+  } catch {
+    // Local storage can be unavailable in some embedded browsers; login still works for this session.
+  }
+}
+
+function updateAuthUI() {
+  const user = state.currentUser;
+  const loginButton = $("#loginButton");
+  const mobileLoginButton = $("#mobileLoginButton");
+  const authForm = $("#authForm");
+  const authProfile = $("#authProfile");
+  const authDescription = $("#authDescription");
+
+  loginButton.textContent = user ? user.name : "登录";
+  loginButton.setAttribute("aria-label", user ? `当前登录：${user.name}` : "登录会速记");
+  mobileLoginButton.textContent = user ? user.name : "登录";
+  mobileLoginButton.setAttribute("aria-label", user ? `当前登录：${user.name}` : "登录会速记");
+  authForm.hidden = Boolean(user);
+  authProfile.hidden = !user;
+  authDescription.textContent = user
+    ? "你已登录演示账号，可以继续生成纪要、查看洞察并体验导出流程。"
+    : "登录后可保存纪要草稿、同步团队模板，并在演示环境中体验协作入口。";
+  if (!user) return;
+  $("#profileName").textContent = user.name;
+  $("#profileEmail").textContent = user.email;
+}
+
+function openAuthModal() {
+  updateAuthUI();
+  const modal = $("#authModal");
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  window.requestAnimationFrame(() => {
+    const focusTarget = state.currentUser ? $("#logoutButton") : $("#loginEmail");
+    focusTarget?.focus();
+  });
+}
+
+function closeAuthModal() {
+  const modal = $("#authModal");
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  $("#loginButton").focus();
+}
+
+function handleLogin(event) {
+  event.preventDefault();
+  const email = $("#loginEmail").value.trim() || "demo@minutes.ai";
+  const rawName = email.split("@")[0] || "demo";
+  const name = rawName === "demo" ? "演示用户" : rawName;
+  state.currentUser = { name, email };
+  saveUser(state.currentUser);
+  updateAuthUI();
+  closeAuthModal();
+  showToast(`欢迎回来，${name}。`);
+}
+
+function handleLogout() {
+  state.currentUser = null;
+  saveUser(null);
+  updateAuthUI();
+  closeAuthModal();
+  showToast("已退出登录。");
+}
+
+function loadSavedSubscription() {
+  try {
+    const saved = window.localStorage.getItem(subscriptionStorageKey);
+    if (!saved) return null;
+    const subscription = JSON.parse(saved);
+    return subscription.expiresAt && Date.parse(subscription.expiresAt) > Date.now() ? subscription : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSubscription(subscription) {
+  try {
+    if (subscription) window.localStorage.setItem(subscriptionStorageKey, JSON.stringify(subscription));
+    else window.localStorage.removeItem(subscriptionStorageKey);
+  } catch {
+    // The current session still keeps the subscription when storage is unavailable.
+  }
+}
+
+function hasSubscription() {
+  return Boolean(state.subscription && subscriptionPlans[state.subscription.planId]);
+}
+
+function updateSubscriptionUI() {
+  const plan = state.subscription ? subscriptionPlans[state.subscription.planId] : null;
+  const status = $("#subscriptionStatus");
+  if (status) {
+    status.textContent = plan
+      ? `当前订阅：${plan.name} · 有效期至 ${new Date(state.subscription.expiresAt).toLocaleDateString("zh-CN")}`
+      : "当前未订阅 · 选择方案后才可使用功能";
+  }
+
+  document.querySelectorAll("[data-plan-card]").forEach(card => {
+    const isCurrent = plan?.id === card.dataset.planCard;
+    card.classList.toggle("is-current", isCurrent);
+    const button = card.querySelector(".plan-select");
+    if (!button) return;
+    button.textContent = isCurrent ? "当前方案" : `选择${subscriptionPlans[card.dataset.planCard].name}`;
+    button.disabled = isCurrent;
+  });
+}
+
+function requireSubscription(action, targetView = "subscription") {
+  if (hasSubscription()) return true;
+  if (targetView && protectedViews.has(targetView)) state.pendingView = targetView;
+  showToast(`${action}需要有效订阅，请先选择套餐。`);
+  setView("subscription", { skipGate: true });
+  return false;
+}
+
+function allowPlanUsage(type, targetView) {
+  if (!requireSubscription(type === "ppt" ? "生成 PPT" : "AI 整理", targetView)) return false;
+  if (state.subscription.planId !== "personal") return true;
+  const used = Number(state.subscription[type === "ppt" ? "pptGenerated" : "aiRuns"] || 0);
+  const limit = type === "ppt" ? 5 : 30;
+  if (used < limit) return true;
+  showToast(`个人效率版本月${type === "ppt" ? "PPT" : "AI 整理"}额度已用完，请升级方案。`);
+  setView("subscription", { skipGate: true });
+  return false;
+}
+
+function recordPlanUsage(type) {
+  if (!state.subscription || state.subscription.planId !== "personal") return;
+  const key = type === "ppt" ? "pptGenerated" : "aiRuns";
+  state.subscription[key] = Number(state.subscription[key] || 0) + 1;
+  saveSubscription(state.subscription);
+}
+
+function renderCheckout() {
+  const plan = subscriptionPlans[state.selectedPlan] || subscriptionPlans.pro;
+  $("#checkoutPlanName").textContent = plan.name;
+  $("#checkoutPlanDescription").textContent = plan.description;
+  $("#checkoutPrice").textContent = `¥${plan.price}`;
+  $("#checkoutUnit").textContent = plan.unit;
+  $("#checkoutFeatures").innerHTML = plan.features.map(item => `<li>${item}</li>`).join("");
+  $("#confirmPaymentButton").textContent = `确认支付 ¥${plan.price}`;
+}
+
+function startCheckout(planId) {
+  if (!subscriptionPlans[planId]) return;
+  state.selectedPlan = planId;
+  renderCheckout();
+  setView("payment", { skipGate: true });
+}
+
+function selectPaymentMethod(method) {
+  state.paymentMethod = method;
+  document.querySelectorAll("[data-payment-method]").forEach(button => {
+    button.classList.toggle("active", button.dataset.paymentMethod === method);
+  });
+  const isWallet = method === "wechat" || method === "alipay";
+  $("#walletPayment").hidden = !isWallet;
+  $("#cardPayment").hidden = isWallet;
+  if (isWallet) $("#walletTitle").textContent = method === "wechat" ? "微信扫码支付" : "支付宝扫码支付";
+}
+
+function confirmPayment() {
+  if (!state.currentUser) {
+    showToast("支付前请先登录账号。");
+    openAuthModal();
+    return;
+  }
+  const plan = subscriptionPlans[state.selectedPlan] || subscriptionPlans.pro;
+  const startedAt = new Date();
+  const expiresAt = new Date(startedAt);
+  expiresAt.setMonth(expiresAt.getMonth() + 1);
+  state.subscription = {
+    planId: plan.id,
+    paymentMethod: state.paymentMethod,
+    startedAt: startedAt.toISOString(),
+    expiresAt: expiresAt.toISOString()
+  };
+  saveSubscription(state.subscription);
+  updateSubscriptionUI();
+  showToast(`${plan.name}订阅成功，功能已解锁。`);
+  const destination = state.pendingView || "dashboard";
+  state.pendingView = null;
+  setView(destination, { skipGate: true });
+}
+
+function setView(view, options = {}) {
+  let nextView = viewMeta[view] ? view : "intro";
+  if (!options.skipGate && protectedViews.has(nextView) && !hasSubscription()) {
+    state.pendingView = nextView;
+    nextView = "subscription";
+    showToast("使用功能前需要先完成订阅。");
+  }
   state.currentView = nextView;
   document.body.dataset.view = nextView;
   document.querySelectorAll(".view").forEach(item => {
@@ -605,6 +855,7 @@ async function postJson(url, body) {
 }
 
 async function generateMinutes() {
+  if (!allowPlanUsage("ai", "dashboard")) return;
   const title = $("#titleInput").value.trim();
   const transcript = $("#transcriptInput").value.trim();
   if (transcript.length < 20) {
@@ -618,10 +869,12 @@ async function generateMinutes() {
   try {
     const payload = await postJson("/api/minutes", { title, transcript });
     renderMinutes(enrichMinutes(payload.minutes, transcript));
+    recordPlanUsage("ai");
     showToast("纪要已生成。");
   } catch (error) {
     const minutes = enrichMinutes(summarizeLocal(title, transcript), transcript);
     renderMinutes(minutes);
+    recordPlanUsage("ai");
     showToast("后端 API 暂不可用，已自动切换到浏览器本地兜底。");
   } finally {
     setLoading(false);
@@ -629,6 +882,7 @@ async function generateMinutes() {
 }
 
 async function askQuestion() {
+  if (!requireSubscription("纪要追问", "ask")) return;
   if (!state.minutes) {
     showToast("请先生成纪要。");
     return;
@@ -648,6 +902,7 @@ async function askQuestion() {
 }
 
 function copyMinutes() {
+  if (!requireSubscription("复制纪要", "export")) return;
   if (!state.minutes) {
     showToast("暂无可复制纪要，请先生成。");
     return;
@@ -698,6 +953,7 @@ function downloadFile(filename, content, type) {
 }
 
 function exportMarkdown() {
+  if (!requireSubscription("导出 Markdown", "export")) return;
   if (!state.minutes) {
     showToast("请先生成纪要。");
     return;
@@ -707,12 +963,223 @@ function exportMarkdown() {
 }
 
 function exportJson() {
+  if (!requireSubscription("导出 JSON", "export")) return;
   if (!state.minutes) {
     showToast("请先生成纪要。");
     return;
   }
   downloadFile(`${state.minutes.title || "minutes"}.json`, JSON.stringify(state.minutes, null, 2), "application/json;charset=utf-8");
   showToast("JSON 已导出。");
+}
+
+function loadMinutesToNotes() {
+  if (!requireSubscription("导入纪要到笔记", "notes")) return;
+  if (!state.minutes) {
+    showToast("请先生成一份纪要，再导入笔记工作区。");
+    return;
+  }
+  $("#noteTitleInput").value = state.minutes.title || "会议整理";
+  $("#noteInput").value = buildMarkdown(state.minutes);
+  showToast("当前纪要已导入笔记工作区。");
+}
+
+function organizeNoteContent(title, content) {
+  const cleanLines = content
+    .replace(/^#{1,6}\s*/gm, "")
+    .split(/\n+/)
+    .map(line => line.replace(/^[-*]\s*/, "").trim())
+    .filter(Boolean);
+  const sentences = unique(cleanLines.flatMap(line => splitSentences(line)));
+  const actionPattern = /(负责|需要|完成|跟进|提交|确认|更新|整理|同步|截止|下一步|行动)/;
+  const highlightPattern = /(决定|结论|重点|目标|数据|风险|建议|方案|问题|成果|增长|下降)/;
+  const actions = sentences.filter(item => actionPattern.test(item)).slice(0, 6);
+  const highlights = unique([
+    ...sentences.filter(item => highlightPattern.test(item)),
+    ...sentences.filter(item => !actionPattern.test(item))
+  ]).slice(0, 6);
+  const summarySource = highlights.length ? highlights : sentences;
+  const summary = summarySource.slice(0, 2).join("；") || "已完成内容整理，建议补充更多原始信息。";
+  const resolvedActions = actions.length ? actions : ["补充负责人、截止时间和下一步行动。"];
+  const resolvedHighlights = highlights.length ? highlights : ["当前内容较短，建议补充背景、结论和关键数据。"];
+  return {
+    title: title || "整理笔记",
+    summary,
+    highlights: resolvedHighlights,
+    actions: resolvedActions,
+    slides: [
+      { title: title || "整理笔记", bullets: ["AI 整理演示", "由会速记自动生成"] },
+      { title: "内容摘要", bullets: [summary] },
+      { title: "核心重点", bullets: resolvedHighlights },
+      { title: "行动事项", bullets: resolvedActions }
+    ]
+  };
+}
+
+function renderOrganizedNotes(notes) {
+  $("#organizedNoteTitle").textContent = notes.title;
+  $("#organizedSummary").textContent = notes.summary;
+  listItems("#organizedHighlights", notes.highlights);
+  listItems("#organizedActions", notes.actions);
+  $("#slideOutline").innerHTML = [
+    '<span class="result-label">PPT 结构</span>',
+    ...notes.slides.map((slide, index) => `<p>${index + 1}. ${slide.title} · ${slide.bullets.length} 个内容点</p>`)
+  ].join("");
+  $("#generatePptButton").disabled = false;
+  prepareReveal($("#notesView"));
+}
+
+function organizeNotes() {
+  if (!allowPlanUsage("ai", "notes")) return;
+  const title = $("#noteTitleInput").value.trim();
+  const content = $("#noteInput").value.trim();
+  if (content.length < 20) {
+    showToast("请先输入至少 20 个字符的笔记内容。");
+    return;
+  }
+  state.organizedNotes = organizeNoteContent(title, content);
+  renderOrganizedNotes(state.organizedNotes);
+  recordPlanUsage("ai");
+  showToast("笔记已完成结构化整理。");
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function concatBytes(parts) {
+  const length = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(length);
+  let offset = 0;
+  parts.forEach(part => {
+    output.set(part, offset);
+    offset += part.length;
+  });
+  return output;
+}
+
+const crcTable = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  bytes.forEach(byte => {
+    crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  });
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function createStoredZip(entries) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let localOffset = 0;
+
+  entries.forEach(entry => {
+    const name = encoder.encode(entry.name);
+    const data = typeof entry.data === "string" ? encoder.encode(entry.data) : entry.data;
+    const checksum = crc32(data);
+    const localHeader = new Uint8Array(30);
+    const localView = new DataView(localHeader.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 0x0800, true);
+    localView.setUint32(14, checksum, true);
+    localView.setUint32(18, data.length, true);
+    localView.setUint32(22, data.length, true);
+    localView.setUint16(26, name.length, true);
+    localParts.push(localHeader, name, data);
+
+    const centralHeader = new Uint8Array(46);
+    const centralView = new DataView(centralHeader.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 0x0800, true);
+    centralView.setUint32(16, checksum, true);
+    centralView.setUint32(20, data.length, true);
+    centralView.setUint32(24, data.length, true);
+    centralView.setUint16(28, name.length, true);
+    centralView.setUint32(42, localOffset, true);
+    centralParts.push(centralHeader, name);
+    localOffset += localHeader.length + name.length + data.length;
+  });
+
+  const centralDirectory = concatBytes(centralParts);
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(8, entries.length, true);
+  endView.setUint16(10, entries.length, true);
+  endView.setUint32(12, centralDirectory.length, true);
+  endView.setUint32(16, localOffset, true);
+  return concatBytes([...localParts, centralDirectory, end]);
+}
+
+function pptTextShape(id, name, x, y, cx, cy, paragraphs, options = {}) {
+  const fontSize = options.fontSize || 2200;
+  const color = options.color || "F3F4F4";
+  const paragraphXml = paragraphs.map(text => `
+    <a:p>${options.bullet ? '<a:pPr marL="342900" indent="-228600"><a:buChar char="•"/></a:pPr>' : ""}<a:r><a:rPr lang="zh-CN" sz="${fontSize}" b="${options.bold ? 1 : 0}"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="Aptos"/><a:ea typeface="Microsoft YaHei"/></a:rPr><a:t>${escapeXml(text)}</a:t></a:r><a:endParaRPr lang="zh-CN" sz="${fontSize}"/></a:p>`).join("");
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${escapeXml(name)}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square"/><a:lstStyle/>${paragraphXml}</p:txBody></p:sp>`;
+}
+
+function pptSlideXml(slide, index) {
+  const title = pptTextShape(2, "Title", 700000, 520000, 10800000, 950000, [slide.title], { fontSize: index === 0 ? 3600 : 3000, bold: true, color: "F3F4F4" });
+  const body = pptTextShape(3, "Content", 900000, 1750000, 10200000, 4050000, slide.bullets, { fontSize: index === 0 ? 2200 : 1900, bullet: index !== 0, color: index === 0 ? "3EC9A2" : "ACAAA4" });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="030404"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${title}${body}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+}
+
+function buildPptx(notes) {
+  const slideCount = notes.slides.length;
+  const overrides = notes.slides.map((_, index) => `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`).join("");
+  const slideIds = notes.slides.map((_, index) => `<p:sldId id="${256 + index}" r:id="rId${index + 2}"/>`).join("");
+  const slideRelationships = notes.slides.map((_, index) => `<Relationship Id="rId${index + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${index + 1}.xml"/>`).join("");
+  const entries = [
+    { name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>${overrides}</Types>` },
+    { name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>` },
+    { name: "docProps/core.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${escapeXml(notes.title)}</dc:title><dc:creator>会速记 AI</dc:creator><cp:lastModifiedBy>会速记 AI</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created></cp:coreProperties>` },
+    { name: "docProps/app.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>会速记 AI</Application><PresentationFormat>Widescreen</PresentationFormat><Slides>${slideCount}</Slides><Notes>0</Notes></Properties>` },
+    { name: "ppt/presentation.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>${slideIds}</p:sldIdLst><p:sldSz cx="12192000" cy="6858000" type="screen16x9"/><p:notesSz cx="6858000" cy="9144000"/><p:defaultTextStyle/></p:presentation>` },
+    { name: "ppt/_rels/presentation.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>${slideRelationships}</Relationships>` },
+    { name: "ppt/slideMasters/slideMaster1.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name="Master"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMap accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" bg1="lt1" bg2="lt2" folHlink="folHlink" hlink="hlink" tx1="dk1" tx2="dk2"/><p:sldLayoutIdLst><p:sldLayoutId id="1" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>` },
+    { name: "ppt/slideMasters/_rels/slideMaster1.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/></Relationships>` },
+    { name: "ppt/slideLayouts/slideLayout1.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="blank" preserve="1"><p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>` },
+    { name: "ppt/slideLayouts/_rels/slideLayout1.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>` },
+    { name: "ppt/theme/theme1.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="会速记"><a:themeElements><a:clrScheme name="会速记"><a:dk1><a:srgbClr val="030404"/></a:dk1><a:lt1><a:srgbClr val="F3F4F4"/></a:lt1><a:dk2><a:srgbClr val="121B2F"/></a:dk2><a:lt2><a:srgbClr val="ACAAA4"/></a:lt2><a:accent1><a:srgbClr val="3EC9A2"/></a:accent1><a:accent2><a:srgbClr val="1A67A5"/></a:accent2><a:accent3><a:srgbClr val="2B9DA4"/></a:accent3><a:accent4><a:srgbClr val="609ADE"/></a:accent4><a:accent5><a:srgbClr val="A06E4D"/></a:accent5><a:accent6><a:srgbClr val="D65B74"/></a:accent6><a:hlink><a:srgbClr val="609ADE"/></a:hlink><a:folHlink><a:srgbClr val="2B9DA4"/></a:folHlink></a:clrScheme><a:fontScheme name="会速记"><a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface="Microsoft YaHei"/><a:cs typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/><a:ea typeface="Microsoft YaHei"/><a:cs typeface="Arial"/></a:minorFont></a:fontScheme><a:fmtScheme name="会速记"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>` }
+  ];
+  notes.slides.forEach((slide, index) => {
+    const slideNumber = index + 1;
+    entries.push({ name: `ppt/slides/slide${slideNumber}.xml`, data: pptSlideXml(slide, index) });
+    entries.push({ name: `ppt/slides/_rels/slide${slideNumber}.xml.rels`, data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>` });
+  });
+  return createStoredZip(entries);
+}
+
+function generateNotesPpt() {
+  if (!allowPlanUsage("ppt", "notes")) return;
+  if (!state.organizedNotes) {
+    showToast("请先完成笔记整理。");
+    return;
+  }
+  const safeName = state.organizedNotes.title.replace(/[\\/:*?"<>|]/g, "-") || "整理笔记";
+  const pptx = buildPptx(state.organizedNotes);
+  $("#generatePptButton").dataset.lastPptSize = String(pptx.length);
+  $("#generatePptButton").dataset.lastPptSignature = Array.from(pptx.slice(0, 4)).join(",");
+  downloadFile(`${safeName}.pptx`, pptx, "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+  recordPlanUsage("ppt");
+  showToast("PPT 已生成并开始下载。");
 }
 
 $("#generateButton").addEventListener("click", generateMinutes);
@@ -723,6 +1190,26 @@ $("#exportMarkdownButton").addEventListener("click", exportMarkdown);
 $("#exportMarkdownButtonSide").addEventListener("click", exportMarkdown);
 $("#exportJsonButton").addEventListener("click", exportJson);
 $("#copyButtonSide").addEventListener("click", copyMinutes);
+$("#loginButton").addEventListener("click", openAuthModal);
+$("#mobileLoginButton").addEventListener("click", openAuthModal);
+$("#authCloseButton").addEventListener("click", closeAuthModal);
+$("#authForm").addEventListener("submit", handleLogin);
+$("#logoutButton").addEventListener("click", handleLogout);
+$("#loadMinutesToNotesButton").addEventListener("click", loadMinutesToNotes);
+$("#organizeNotesButton").addEventListener("click", organizeNotes);
+$("#generatePptButton").addEventListener("click", generateNotesPpt);
+$("#confirmPaymentButton").addEventListener("click", confirmPayment);
+document.querySelectorAll("[data-plan-id]").forEach(button => {
+  button.addEventListener("click", () => startCheckout(button.dataset.planId));
+});
+$("#paymentMethods").addEventListener("click", event => {
+  const button = event.target.closest("[data-payment-method]");
+  if (!button) return;
+  selectPaymentMethod(button.dataset.paymentMethod);
+});
+document.querySelectorAll("[data-auth-close]").forEach(item => {
+  item.addEventListener("click", closeAuthModal);
+});
 $("#actionFilters").addEventListener("click", event => {
   const button = event.target.closest("[data-filter]");
   if (!button) return;
@@ -734,14 +1221,6 @@ document.querySelectorAll("[data-view-target]").forEach(item => {
   item.addEventListener("click", event => {
     event.preventDefault();
     setView(item.dataset.viewTarget);
-  });
-});
-document.querySelectorAll("[data-scroll-target]").forEach(item => {
-  item.addEventListener("click", () => {
-    const target = document.querySelector(item.dataset.scrollTarget);
-    if (!target) return;
-    const top = target.getBoundingClientRect().top + window.scrollY - 68;
-    window.scrollTo({ top, behavior: "smooth" });
   });
 });
 $("#loadSampleButton").addEventListener("click", () => {
@@ -762,11 +1241,22 @@ $("#transcriptInput").addEventListener("input", () => {
 $("#questionInput").addEventListener("keydown", event => {
   if (event.key === "Enter") askQuestion();
 });
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && $("#authModal").classList.contains("is-open")) {
+    closeAuthModal();
+  }
+});
 window.addEventListener("hashchange", () => {
   const hashView = (window.location.hash || "#dashboard").slice(1);
   if (hashView !== state.currentView) setView(hashView);
 });
 
+state.currentUser = loadSavedUser();
+state.subscription = loadSavedSubscription();
+updateAuthUI();
+updateSubscriptionUI();
+renderCheckout();
+selectPaymentMethod(state.paymentMethod);
 renderInitial();
 setView((window.location.hash || "#intro").slice(1));
 initScrollMotion();
