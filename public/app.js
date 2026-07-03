@@ -11,7 +11,9 @@ const state = {
   toastTimer: null,
   actionFilter: "全部",
   lastTranscript: "",
-  currentView: "dashboard"
+  currentView: "dashboard",
+  revealObserver: null,
+  lastScrollY: 0
 };
 
 const $ = selector => document.querySelector(selector);
@@ -261,6 +263,97 @@ function setView(view) {
   $("#pageTitle").textContent = viewMeta[nextView].title;
   $("#pageSubtitle").textContent = viewMeta[nextView].subtitle;
   window.location.hash = nextView;
+  if (window.scrollY > 0) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  queueRevealRefresh();
+}
+
+function getRevealNodes(root = document) {
+  return [
+    ...root.querySelectorAll(`
+      .hero > *,
+      .overview-card,
+      .metric,
+      .panel,
+      .module-card,
+      .summary-card,
+      .plan-card,
+      .chip,
+      .stat-item,
+      .speaker-row,
+      table tr
+    `)
+  ];
+}
+
+function isElementInRevealRange(node) {
+  const rect = node.getBoundingClientRect();
+  return node.getClientRects().length > 0 && rect.top < window.innerHeight * 0.92 && rect.bottom > 0;
+}
+
+function revealVisibleNow(root = document) {
+  getRevealNodes(root).forEach(node => {
+    if (node.classList.contains("is-visible")) return;
+    if (!isElementInRevealRange(node)) return;
+    node.classList.add("is-visible");
+    state.revealObserver?.unobserve(node);
+  });
+}
+
+function prepareReveal(root = document) {
+  if (!state.revealObserver) return;
+  const nodes = getRevealNodes(root);
+  nodes.forEach((node, index) => {
+    if (!node.classList.contains("reveal")) {
+      node.classList.add("reveal");
+    }
+    node.classList.remove("is-visible");
+    node.style.setProperty("--reveal-delay", `${Math.min(index % 8, 7) * 55}ms`);
+    if (isElementInRevealRange(node)) {
+      node.classList.add("is-visible");
+      state.revealObserver.unobserve(node);
+      return;
+    }
+    state.revealObserver.observe(node);
+  });
+}
+
+function queueRevealRefresh(root = document) {
+  if (!state.revealObserver) return;
+  window.requestAnimationFrame(() => prepareReveal(root));
+}
+
+function initScrollMotion() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.body.classList.add("motion-ready");
+  state.revealObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("is-visible");
+      state.revealObserver.unobserve(entry.target);
+    });
+  }, {
+    rootMargin: "0px 0px -12% 0px",
+    threshold: 0.14
+  });
+
+  const updateNavState = () => {
+    document.body.classList.toggle("scrolled", window.scrollY > 12);
+    revealVisibleNow(document.querySelector(".view.active") || document);
+  };
+  updateNavState();
+  window.addEventListener("scroll", updateNavState, { passive: true });
+  window.setInterval(updateNavState, 160);
+  const monitorScroll = () => {
+    if (window.scrollY !== state.lastScrollY) {
+      state.lastScrollY = window.scrollY;
+      updateNavState();
+    }
+    window.requestAnimationFrame(monitorScroll);
+  };
+  window.requestAnimationFrame(monitorScroll);
+  prepareReveal();
 }
 
 function setLoading(isLoading) {
@@ -327,7 +420,7 @@ function renderQuality(minutes) {
   $("#qualityScore").textContent = String(quality.score);
   $("#qualityLabel").textContent = quality.label;
   $("#qualityReason").textContent = quality.reason;
-  $("#scoreRing").style.background = `conic-gradient(var(--teal) 0deg, var(--teal) ${quality.score * 3.6}deg, #e7e2d8 ${quality.score * 3.6}deg)`;
+  $("#scoreRing").style.background = `conic-gradient(var(--blue) 0deg, var(--blue) ${quality.score * 3.6}deg, #e8e8ed ${quality.score * 3.6}deg)`;
 }
 
 function renderSpeakerStats(items) {
@@ -440,6 +533,7 @@ function renderMinutes(minutes) {
     hints.appendChild(button);
   });
   renderExportPreview();
+  prepareReveal(document.querySelector(".view.active") || document);
 }
 
 function renderInitial() {
@@ -618,6 +712,11 @@ $("#transcriptInput").addEventListener("input", () => {
 $("#questionInput").addEventListener("keydown", event => {
   if (event.key === "Enter") askQuestion();
 });
+window.addEventListener("hashchange", () => {
+  const hashView = (window.location.hash || "#dashboard").slice(1);
+  if (hashView !== state.currentView) setView(hashView);
+});
 
 renderInitial();
 setView((window.location.hash || "#dashboard").slice(1));
+initScrollMotion();
