@@ -1070,6 +1070,9 @@ th {
 }
 
 .topics-panel .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 32px;
   padding: 0 14px;
   border: 1px solid rgba(62, 201, 162, 0.14);
@@ -1077,6 +1080,7 @@ th {
   font-size: 13px;
   font-weight: 800;
   line-height: 1;
+  text-align: center;
 }
 
 .stat-grid {
