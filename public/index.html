@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="styles.css?v=5">
+    <link rel="stylesheet" href="styles.css?v=6">
   </head>
   <body>
     <div class="app-shell">
@@ -18,25 +18,25 @@
         </div>
 
         <nav class="rail-nav" aria-label="功能模块">
-          <a class="nav-item active" href="#workspace">
+          <a class="nav-item active" href="#dashboard" data-view-target="dashboard">
             <span class="nav-icon">◆</span>
-            智能纪要
+            总览生成
           </a>
-          <a class="nav-item" href="#intelligence">
+          <a class="nav-item" href="#intelligence" data-view-target="intelligence">
             <span class="nav-icon">◇</span>
-            智能评分
+            智能洞察
           </a>
-          <a class="nav-item" href="#actions">
+          <a class="nav-item" href="#actions" data-view-target="actions">
             <span class="nav-icon">□</span>
-            待办追踪
+            待办中心
           </a>
-          <a class="nav-item" href="#ask">
+          <a class="nav-item" href="#ask" data-view-target="ask">
             <span class="nav-icon">◐</span>
             纪要追问
           </a>
-          <a class="nav-item" href="#export">
+          <a class="nav-item" href="#export" data-view-target="export">
             <span class="nav-icon">⇣</span>
-            纪要导出
+            交付导出
           </a>
         </nav>
 
@@ -51,8 +51,8 @@
         <header class="topbar">
           <div>
             <span class="eyebrow">AI Meeting Command Center</span>
-            <h1>会议纪要智能工作台</h1>
-            <p>把口语化会议转写变成可追踪的决策、风险和责任清单。</p>
+            <h1 id="pageTitle">会议纪要中枢</h1>
+            <p id="pageSubtitle">首页只保留生成和总览，深度能力拆分到独立页面。</p>
           </div>
           <div class="top-actions">
             <button class="ghost-button" id="copyButton">复制纪要</button>
@@ -61,163 +61,191 @@
           </div>
         </header>
 
-        <section class="overview" aria-label="工作台概览">
-          <div class="overview-card lead">
-            <span class="eyebrow">Executive Brief</span>
-            <h2 id="resultTitle">结构化纪要</h2>
-            <p id="resultMeta">生成后将展示摘要、决策、待办和风险。</p>
-          </div>
-          <div class="metric">
-            <span>参会人</span>
-            <strong id="participantCount">0</strong>
-          </div>
-          <div class="metric">
-            <span>关键决策</span>
-            <strong id="decisionCount">0</strong>
-          </div>
-          <div class="metric">
-            <span>待办事项</span>
-            <strong id="actionCount">0</strong>
-          </div>
-          <div class="metric">
-            <span>风险提醒</span>
-            <strong id="riskCount">0</strong>
+        <section class="view active" id="dashboardView" data-view="dashboard" aria-label="总览生成">
+          <section class="overview calm" aria-label="工作台概览">
+            <div class="overview-card lead">
+              <span class="eyebrow">Executive Brief</span>
+              <h2 id="resultTitle">结构化纪要</h2>
+              <p id="resultMeta">生成后将展示摘要、决策、待办和风险。</p>
+            </div>
+            <div class="metric">
+              <span>参会人</span>
+              <strong id="participantCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>关键决策</span>
+              <strong id="decisionCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>待办事项</span>
+              <strong id="actionCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>风险提醒</span>
+              <strong id="riskCount">0</strong>
+            </div>
+          </section>
+
+          <div class="dashboard-grid">
+            <section class="input-pane panel" aria-label="会议输入区">
+              <div class="panel-head">
+                <div>
+                  <span class="eyebrow">Source Material</span>
+                  <h2>会议内容</h2>
+                </div>
+                <button class="icon-button" id="loadSampleButton" title="载入示例" aria-label="载入示例">↺</button>
+              </div>
+
+              <label class="field">
+                <span>会议标题</span>
+                <input id="titleInput" type="text" value="7 月运营活动复盘会" placeholder="输入会议标题">
+              </label>
+
+              <label class="field transcript-field">
+                <span>转写文本</span>
+                <textarea id="transcriptInput" placeholder="粘贴会议转写文本，或上传 .txt 文件"></textarea>
+              </label>
+
+              <div class="upload-row">
+                <label class="file-control">
+                  <input id="fileInput" type="file" accept=".txt,text/plain">
+                  上传文本
+                </label>
+                <button class="secondary-button" id="generateButtonSecondary">生成纪要</button>
+              </div>
+            </section>
+
+            <section class="panel brief-panel" aria-label="核心摘要">
+              <div class="panel-head">
+                <div>
+                  <span class="eyebrow">Live Brief</span>
+                  <h2>核心输出</h2>
+                </div>
+                <span class="live-badge">Ready</span>
+              </div>
+              <div class="summary-band compact" id="summaryList"></div>
+              <div class="module-grid">
+                <button class="module-card" data-view-target="intelligence">
+                  <strong>智能洞察</strong>
+                  <span>评分、发言人贡献、统计</span>
+                </button>
+                <button class="module-card" data-view-target="actions">
+                  <strong>待办中心</strong>
+                  <span>决策、风险、责任事项</span>
+                </button>
+                <button class="module-card" data-view-target="ask">
+                  <strong>纪要追问</strong>
+                  <span>基于纪要上下文问答</span>
+                </button>
+                <button class="module-card" data-view-target="export">
+                  <strong>交付导出</strong>
+                  <span>Markdown / JSON</span>
+                </button>
+              </div>
+            </section>
           </div>
         </section>
 
-        <div class="work-grid">
-          <section class="input-pane panel" aria-label="会议输入区">
-            <div class="panel-head">
-              <div>
-                <span class="eyebrow">Source Material</span>
-                <h2>会议内容</h2>
-              </div>
-              <button class="icon-button" id="loadSampleButton" title="载入示例" aria-label="载入示例">↺</button>
-            </div>
-
-            <label class="field">
-              <span>会议标题</span>
-              <input id="titleInput" type="text" value="7 月运营活动复盘会" placeholder="输入会议标题">
-            </label>
-
-            <label class="field transcript-field">
-              <span>转写文本</span>
-              <textarea id="transcriptInput" placeholder="粘贴会议转写文本，或上传 .txt 文件"></textarea>
-            </label>
-
-            <div class="upload-row">
-              <label class="file-control">
-                <input id="fileInput" type="file" accept=".txt,text/plain">
-                上传文本
-              </label>
-              <button class="secondary-button" id="generateButtonSecondary">生成纪要</button>
-            </div>
-
-            <div class="source-note" id="sourceNote">
-              <strong>处理模式</strong>
-              <span>优先调用后端 API；如果接口不可用，页面会自动切换到本地演示引擎。</span>
-            </div>
-          </section>
-
-          <section class="analysis-pane" aria-label="纪要洞察区">
-            <div class="summary-band" id="summaryList"></div>
-
-            <div class="intelligence-grid" id="intelligence">
-              <article class="panel score-panel">
-                <div class="panel-head compact">
-                  <h3>会议质量评分</h3>
-                  <span class="panel-tag">AI Score</span>
-                </div>
-                <div class="score-body">
-                  <div class="score-ring" id="scoreRing">
-                    <strong id="qualityScore">0</strong>
-                    <span>score</span>
-                  </div>
-                  <div class="score-copy">
-                    <h4 id="qualityLabel">等待分析</h4>
-                    <p id="qualityReason">生成纪要后将评估结论明确度、待办完整度和风险可控性。</p>
-                  </div>
-                </div>
-              </article>
-
-              <article class="panel">
-                <div class="panel-head compact">
-                  <h3>发言人贡献</h3>
-                  <span class="panel-tag">Speaker Map</span>
-                </div>
-                <div class="speaker-list" id="speakerList"></div>
-              </article>
-
-              <article class="panel">
-                <div class="panel-head compact">
-                  <h3>下一步建议</h3>
-                  <span class="panel-tag">Next Best Action</span>
-                </div>
-                <ul class="next-list" id="nextStepList"></ul>
-              </article>
-            </div>
-
-            <div class="insight-grid">
-              <article class="panel">
-                <div class="panel-head compact">
-                  <h3>关键决策</h3>
-                  <span class="panel-tag">Decision</span>
-                </div>
-                <ul id="decisionList"></ul>
-              </article>
-              <article class="panel">
-                <div class="panel-head compact">
-                  <h3>风险提醒</h3>
-                  <span class="panel-tag danger">Risk</span>
-                </div>
-                <ul id="riskList"></ul>
-              </article>
-            </div>
-
-            <article class="panel wide" id="actions">
+        <section class="view" id="intelligenceView" data-view="intelligence" aria-label="智能洞察">
+          <div class="intelligence-grid spread">
+            <article class="panel score-panel">
               <div class="panel-head compact">
-                <h3>待办事项</h3>
-                <div class="segmented" id="actionFilters" aria-label="待办筛选">
-                  <button class="segment active" data-filter="全部">全部</button>
-                  <button class="segment" data-filter="待开始">待开始</button>
-                  <button class="segment" data-filter="进行中">进行中</button>
-                </div>
+                <h3>会议质量评分</h3>
+                <span class="panel-tag">AI Score</span>
               </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>负责人</th>
-                      <th>任务</th>
-                      <th>截止时间</th>
-                      <th>状态</th>
-                    </tr>
-                  </thead>
-                  <tbody id="actionTable"></tbody>
-                </table>
+              <div class="score-body">
+                <div class="score-ring" id="scoreRing">
+                  <strong id="qualityScore">0</strong>
+                  <span>score</span>
+                </div>
+                <div class="score-copy">
+                  <h4 id="qualityLabel">等待分析</h4>
+                  <p id="qualityReason">生成纪要后将评估结论明确度、待办完整度和风险可控性。</p>
+                </div>
               </div>
             </article>
 
-            <div class="bottom-grid">
-              <article class="panel">
-                <div class="panel-head compact">
-                  <h3>议题标签</h3>
-                  <span class="panel-tag">Topics</span>
-                </div>
-                <div class="chips" id="topicList"></div>
-              </article>
+            <article class="panel">
+              <div class="panel-head compact">
+                <h3>发言人贡献</h3>
+                <span class="panel-tag">Speaker Map</span>
+              </div>
+              <div class="speaker-list" id="speakerList"></div>
+            </article>
 
-              <article class="panel">
-                <div class="panel-head compact">
-                  <h3>转写统计</h3>
-                  <span class="panel-tag">Transcript Stats</span>
-                </div>
-                <div class="stat-grid" id="transcriptStats"></div>
-              </article>
+            <article class="panel">
+              <div class="panel-head compact">
+                <h3>下一步建议</h3>
+                <span class="panel-tag">Next Best Action</span>
+              </div>
+              <ul class="next-list" id="nextStepList"></ul>
+            </article>
+          </div>
+
+          <div class="bottom-grid">
+            <article class="panel">
+              <div class="panel-head compact">
+                <h3>议题标签</h3>
+                <span class="panel-tag">Topics</span>
+              </div>
+              <div class="chips" id="topicList"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-head compact">
+                <h3>转写统计</h3>
+                <span class="panel-tag">Transcript Stats</span>
+              </div>
+              <div class="stat-grid" id="transcriptStats"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" id="actionsView" data-view="actions" aria-label="待办中心">
+          <div class="insight-grid">
+            <article class="panel">
+              <div class="panel-head compact">
+                <h3>关键决策</h3>
+                <span class="panel-tag">Decision</span>
+              </div>
+              <ul id="decisionList"></ul>
+            </article>
+            <article class="panel">
+              <div class="panel-head compact">
+                <h3>风险提醒</h3>
+                <span class="panel-tag danger">Risk</span>
+              </div>
+              <ul id="riskList"></ul>
+            </article>
+          </div>
+
+          <article class="panel wide" id="actions">
+            <div class="panel-head compact">
+              <h3>责任事项</h3>
+              <div class="segmented" id="actionFilters" aria-label="待办筛选">
+                <button class="segment active" data-filter="全部">全部</button>
+                <button class="segment" data-filter="待开始">待开始</button>
+                <button class="segment" data-filter="进行中">进行中</button>
+              </div>
             </div>
-          </section>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>负责人</th>
+                    <th>任务</th>
+                    <th>截止时间</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody id="actionTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
 
-          <aside class="assistant-pane panel" id="ask" aria-label="纪要追问区">
+        <section class="view" id="askView" data-view="ask" aria-label="纪要追问">
+          <article class="assistant-page panel" id="ask">
             <div class="panel-head">
               <div>
                 <span class="eyebrow">Context Q&A</span>
@@ -234,22 +262,33 @@
             </div>
 
             <pre id="answerBox"></pre>
+          </article>
+        </section>
 
-            <div class="export-box" id="export">
-              <span class="eyebrow">Delivery Center</span>
-              <h3>交付动作</h3>
-              <div class="export-actions">
-                <button class="ghost-button" id="exportJsonButton">导出 JSON</button>
-                <button class="ghost-button" id="exportMarkdownButtonSide">导出 Markdown</button>
+        <section class="view" id="exportView" data-view="export" aria-label="交付导出">
+          <article class="panel export-page" id="export">
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">Delivery Center</span>
+                <h2>纪要交付中心</h2>
               </div>
+              <span class="panel-tag">Markdown / JSON</span>
             </div>
-          </aside>
-        </div>
+            <div class="export-layout">
+              <div class="export-actions">
+                <button class="primary-button" id="exportMarkdownButtonSide">导出 Markdown</button>
+                <button class="ghost-button" id="exportJsonButton">导出 JSON</button>
+                <button class="ghost-button" id="copyButtonSide">复制到剪贴板</button>
+              </div>
+              <pre class="export-preview" id="exportPreview">生成纪要后，这里会显示可交付的 Markdown 预览。</pre>
+            </div>
+          </article>
+        </section>
       </main>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=6"></script>
   </body>
 </html>

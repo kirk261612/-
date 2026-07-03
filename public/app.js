@@ -10,10 +10,34 @@ const state = {
   minutes: null,
   toastTimer: null,
   actionFilter: "全部",
-  lastTranscript: ""
+  lastTranscript: "",
+  currentView: "dashboard"
 };
 
 const $ = selector => document.querySelector(selector);
+
+const viewMeta = {
+  dashboard: {
+    title: "会议纪要中枢",
+    subtitle: "首页只保留生成和总览，深度能力拆分到独立页面。"
+  },
+  intelligence: {
+    title: "智能洞察",
+    subtitle: "查看会议质量评分、发言人贡献、议题标签和转写统计。"
+  },
+  actions: {
+    title: "待办中心",
+    subtitle: "集中管理关键决策、风险提醒和责任事项。"
+  },
+  ask: {
+    title: "纪要追问",
+    subtitle: "基于当前结构化纪要继续提问，快速定位结论和风险。"
+  },
+  export: {
+    title: "交付导出",
+    subtitle: "复制或导出 Markdown / JSON，用于周报、邮件和任务系统。"
+  }
+};
 
 function unique(items) {
   return [...new Set(items.filter(Boolean))];
@@ -221,6 +245,20 @@ function showToast(message) {
   state.toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
+function setView(view) {
+  const nextView = viewMeta[view] ? view : "dashboard";
+  state.currentView = nextView;
+  document.querySelectorAll(".view").forEach(item => {
+    item.classList.toggle("active", item.dataset.view === nextView);
+  });
+  document.querySelectorAll("[data-view-target]").forEach(item => {
+    item.classList.toggle("active", item.dataset.viewTarget === nextView);
+  });
+  $("#pageTitle").textContent = viewMeta[nextView].title;
+  $("#pageSubtitle").textContent = viewMeta[nextView].subtitle;
+  window.location.hash = nextView;
+}
+
 function setLoading(isLoading) {
   $("#generateButton").disabled = isLoading;
   $("#generateButtonSecondary").disabled = isLoading;
@@ -397,6 +435,7 @@ function renderMinutes(minutes) {
     });
     hints.appendChild(button);
   });
+  renderExportPreview();
 }
 
 function renderInitial() {
@@ -410,6 +449,7 @@ function renderInitial() {
   renderNextSteps(["生成纪要后将展示优先推进事项。"]);
   renderTranscriptStats(analyzeTranscript(sampleText));
   $("#actionTable").innerHTML = `<tr><td class="empty" colspan="4">等待生成待办事项</td></tr>`;
+  renderExportPreview();
 }
 
 async function postJson(url, body) {
@@ -499,6 +539,12 @@ function buildMarkdown(minutes) {
   ].join("\n");
 }
 
+function renderExportPreview() {
+  const node = $("#exportPreview");
+  if (!node) return;
+  node.textContent = state.minutes ? buildMarkdown(state.minutes) : "生成纪要后，这里会显示可交付的 Markdown 预览。";
+}
+
 function downloadFile(filename, content, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -536,12 +582,19 @@ $("#copyButton").addEventListener("click", copyMinutes);
 $("#exportMarkdownButton").addEventListener("click", exportMarkdown);
 $("#exportMarkdownButtonSide").addEventListener("click", exportMarkdown);
 $("#exportJsonButton").addEventListener("click", exportJson);
+$("#copyButtonSide").addEventListener("click", copyMinutes);
 $("#actionFilters").addEventListener("click", event => {
   const button = event.target.closest("[data-filter]");
   if (!button) return;
   state.actionFilter = button.dataset.filter;
   $("#actionFilters").querySelectorAll(".segment").forEach(item => item.classList.toggle("active", item === button));
   if (state.minutes) renderActionTable(state.minutes);
+});
+document.querySelectorAll("[data-view-target]").forEach(item => {
+  item.addEventListener("click", event => {
+    event.preventDefault();
+    setView(item.dataset.viewTarget);
+  });
 });
 $("#loadSampleButton").addEventListener("click", () => {
   $("#transcriptInput").value = sampleText;
@@ -563,3 +616,4 @@ $("#questionInput").addEventListener("keydown", event => {
 });
 
 renderInitial();
+setView((window.location.hash || "#dashboard").slice(1));
