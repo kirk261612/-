@@ -11,7 +11,7 @@ const state = {
   toastTimer: null,
   actionFilter: "全部",
   lastTranscript: "",
-  currentView: "dashboard",
+  currentView: "intro",
   revealObserver: null,
   lastScrollY: 0
 };
@@ -20,8 +20,8 @@ const $ = selector => document.querySelector(selector);
 
 const viewMeta = {
   dashboard: {
-    title: "会议纪要中枢",
-    subtitle: "首页只保留生成和总览，深度能力拆分到独立页面。"
+    title: "功能工作台",
+    subtitle: "在这里粘贴会议转写、生成结构化纪要，并继续追问或导出。"
   },
   intro: {
     title: "产品介绍",
@@ -258,6 +258,7 @@ function showToast(message) {
 function setView(view) {
   const nextView = viewMeta[view] ? view : "dashboard";
   state.currentView = nextView;
+  document.body.dataset.view = nextView;
   document.querySelectorAll(".view").forEach(item => {
     item.classList.toggle("active", item.dataset.view === nextView);
   });
@@ -278,10 +279,15 @@ function getRevealNodes(root = document) {
   return [
     ...root.querySelectorAll(`
       .hero > *,
+      .landing-intro,
+      .workflow-window,
+      .capability-card,
       .overview-card,
       .metric,
       .panel,
       .module-card,
+      .integration-hero,
+      .integration-card,
       .summary-card,
       .plan-card,
       .chip,
@@ -456,7 +462,7 @@ function renderQuality(minutes) {
   $("#qualityScore").textContent = String(quality.score);
   $("#qualityLabel").textContent = quality.label;
   $("#qualityReason").textContent = quality.reason;
-  $("#scoreRing").style.background = `conic-gradient(var(--blue) 0deg, var(--blue) ${quality.score * 3.6}deg, #e8e8ed ${quality.score * 3.6}deg)`;
+  $("#scoreRing").style.background = `conic-gradient(var(--green) 0deg, var(--green) ${quality.score * 3.6}deg, rgba(243, 244, 244, 0.1) ${quality.score * 3.6}deg)`;
 }
 
 function renderSpeakerStats(items) {
@@ -730,6 +736,14 @@ document.querySelectorAll("[data-view-target]").forEach(item => {
     setView(item.dataset.viewTarget);
   });
 });
+document.querySelectorAll("[data-scroll-target]").forEach(item => {
+  item.addEventListener("click", () => {
+    const target = document.querySelector(item.dataset.scrollTarget);
+    if (!target) return;
+    const top = target.getBoundingClientRect().top + window.scrollY - 68;
+    window.scrollTo({ top, behavior: "smooth" });
+  });
+});
 $("#loadSampleButton").addEventListener("click", () => {
   $("#transcriptInput").value = sampleText;
   renderTranscriptStats(analyzeTranscript(sampleText));
@@ -754,5 +768,5 @@ window.addEventListener("hashchange", () => {
 });
 
 renderInitial();
-setView((window.location.hash || "#dashboard").slice(1));
+setView((window.location.hash || "#intro").slice(1));
 initScrollMotion();

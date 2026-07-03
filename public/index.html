@@ -4,17 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=12">
   </head>
   <body>
     <header class="store-nav">
-      <a class="store-brand" href="#dashboard" data-view-target="dashboard" aria-label="会速记首页">
+      <a class="store-brand" href="#intro" data-view-target="intro" aria-label="会速记首页">
         <span class="brand-mark">M</span>
         <span>会速记</span>
       </a>
       <nav class="store-links" aria-label="主导航">
-        <a class="nav-item active" href="#dashboard" data-view-target="dashboard">总览</a>
-        <a class="nav-item" href="#intro" data-view-target="intro">介绍</a>
+        <a class="nav-item active" href="#intro" data-view-target="intro">介绍</a>
+        <a class="nav-item" href="#dashboard" data-view-target="dashboard">功能</a>
         <a class="nav-item" href="#intelligence" data-view-target="intelligence">洞察</a>
         <a class="nav-item" href="#actions" data-view-target="actions">待办</a>
         <a class="nav-item" href="#ask" data-view-target="ask">追问</a>
@@ -28,18 +28,163 @@
     </header>
 
     <main class="main" id="workspace">
+      <section class="landing-intro intro-only" aria-label="产品介绍首屏">
+        <div class="landing-copy">
+          <p class="eyebrow">AI Meeting Workflow Platform</p>
+          <h1>会议纪要，自动流转。</h1>
+          <p>会速记从转写文本中提炼摘要、决策、风险和责任事项，再把结果送进知识库、待办系统、客服 FAQ 和周报交付链路。</p>
+          <div class="landing-actions">
+            <button class="primary-button" data-view-target="dashboard">打开功能页</button>
+            <button class="ghost-button" data-scroll-target=".feature-showcase">查看滚动演示</button>
+          </div>
+        </div>
+        <div class="landing-product" aria-label="产品功能预览">
+          <div class="workflow-window">
+            <div class="window-top">
+              <span></span>
+              <span></span>
+              <span></span>
+              <strong>Meeting Flow</strong>
+            </div>
+            <div class="flow-canvas">
+              <div class="flow-node active">
+                <span>01</span>
+                <strong>会议转写</strong>
+                <small>Transcript</small>
+              </div>
+              <div class="flow-link"></div>
+              <div class="flow-node">
+                <span>02</span>
+                <strong>AI 纪要</strong>
+                <small>Summary</small>
+              </div>
+              <div class="flow-link"></div>
+              <div class="flow-node">
+                <span>03</span>
+                <strong>待办同步</strong>
+                <small>Tasks</small>
+              </div>
+            </div>
+            <div class="insight-strip">
+              <div><strong>96</strong><span>质量评分</span></div>
+              <div><strong>8</strong><span>责任事项</span></div>
+              <div><strong>2</strong><span>风险提醒</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="hero">
         <p class="eyebrow">AI Meeting Intelligence</p>
-        <h1 id="pageTitle">会议纪要，变成一件漂亮的事。</h1>
-        <p id="pageSubtitle">简洁首页负责生成，洞察、待办、追问、导出和订阅拆到独立页面。</p>
+        <h1 id="pageTitle">会议纪要，连接团队正在使用的每个工具。</h1>
+        <p id="pageSubtitle">从会议转写到结构化纪要、待办追踪和导出交付，统一在一个深色 AI 工作流中完成。</p>
         <div class="hero-actions">
           <button class="primary-button" id="copyButton">复制纪要</button>
           <button class="ghost-button" id="exportMarkdownButton">导出 MD</button>
         </div>
       </section>
 
-      <section class="view active" id="dashboardView" data-view="dashboard" aria-label="总览生成">
-        <section class="overview calm" aria-label="工作台概览">
+      <section class="view active" id="dashboardView" data-view="dashboard" aria-label="功能工作台">
+        <section class="integration-hero" aria-label="工具集成展示">
+          <div class="integration-copy">
+            <span class="eyebrow">Integration Hub</span>
+            <h2>让会议结果进入团队已经在用的流程。</h2>
+            <p>会速记把摘要、决策、责任人和风险转成统一数据结构，后续可以进入知识库、项目管理、客服 FAQ 和周报交付。</p>
+            <div class="integration-search">
+              <span>⌘</span>
+              <input type="text" value="搜索会议、待办、知识库或团队工具" aria-label="集成搜索演示" readonly>
+            </div>
+            <div class="integration-tags" aria-label="能力标签">
+              <span>AI Minutes</span>
+              <span>RAG Ready</span>
+              <span>Task Sync</span>
+              <span>Export API</span>
+            </div>
+          </div>
+          <div class="integration-grid" aria-label="集成卡片">
+            <article class="integration-card featured">
+              <span class="app-icon">M</span>
+              <strong>会议纪要</strong>
+              <small>SUMMARY</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">K</span>
+              <strong>知识库</strong>
+              <small>RAG</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">T</span>
+              <strong>待办系统</strong>
+              <small>TASKS</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">F</span>
+              <strong>客服 FAQ</strong>
+              <small>SUPPORT</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">D</span>
+              <strong>数据看板</strong>
+              <small>INSIGHT</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">W</span>
+              <strong>周报导出</strong>
+              <small>DELIVERY</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">A</span>
+              <strong>追问助手</strong>
+              <small>AGENT</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">S</span>
+              <strong>安全审计</strong>
+              <small>AUDIT</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="capability-suite" aria-label="功能能力矩阵">
+          <div class="section-intro">
+            <span class="eyebrow">Capabilities</span>
+            <h2>从会议输入到会后执行，一套完整闭环。</h2>
+          </div>
+          <div class="capability-grid">
+            <article class="capability-card">
+              <span>01</span>
+              <h3>转写文本解析</h3>
+              <p>识别发言人、段落、句子和业务关键词，为结构化纪要准备上下文。</p>
+            </article>
+            <article class="capability-card">
+              <span>02</span>
+              <h3>结构化纪要</h3>
+              <p>自动输出摘要、证据、决策、风险、主题和追问建议。</p>
+            </article>
+            <article class="capability-card">
+              <span>03</span>
+              <h3>责任事项追踪</h3>
+              <p>提炼负责人、任务、截止时间和状态，支持按进展筛选。</p>
+            </article>
+            <article class="capability-card">
+              <span>04</span>
+              <h3>会议质量评分</h3>
+              <p>根据决策数量、待办完整度、风险覆盖和发言参与度生成评分。</p>
+            </article>
+            <article class="capability-card">
+              <span>05</span>
+              <h3>纪要上下文追问</h3>
+              <p>围绕当前纪要继续问决策、风险、负责人和截止时间。</p>
+            </article>
+            <article class="capability-card">
+              <span>06</span>
+              <h3>交付导出</h3>
+              <p>支持复制纪要、导出 Markdown / JSON，方便进入周报和任务系统。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="overview calm" id="minutesWorkbench" aria-label="工作台概览">
           <div class="overview-card lead">
             <span class="eyebrow">Executive Brief</span>
             <h2 id="resultTitle">结构化纪要</h2>
@@ -124,6 +269,105 @@
       </section>
 
       <section class="view" id="introView" data-view="intro" aria-label="产品介绍">
+        <section class="integration-hero" aria-label="工具集成展示">
+          <div class="integration-copy">
+            <span class="eyebrow">Integration Hub</span>
+            <h2>让会议结果进入团队已经在用的流程。</h2>
+            <p>会速记把摘要、决策、责任人和风险转成统一数据结构，后续可以进入知识库、项目管理、客服 FAQ 和周报交付。</p>
+            <div class="integration-search">
+              <span>⌘</span>
+              <input type="text" value="搜索会议、待办、知识库或团队工具" aria-label="集成搜索演示" readonly>
+            </div>
+            <div class="integration-tags" aria-label="能力标签">
+              <span>AI Minutes</span>
+              <span>RAG Ready</span>
+              <span>Task Sync</span>
+              <span>Export API</span>
+            </div>
+          </div>
+          <div class="integration-grid" aria-label="集成卡片">
+            <article class="integration-card featured">
+              <span class="app-icon">M</span>
+              <strong>会议纪要</strong>
+              <small>SUMMARY</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">K</span>
+              <strong>知识库</strong>
+              <small>RAG</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">T</span>
+              <strong>待办系统</strong>
+              <small>TASKS</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">F</span>
+              <strong>客服 FAQ</strong>
+              <small>SUPPORT</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">D</span>
+              <strong>数据看板</strong>
+              <small>INSIGHT</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">W</span>
+              <strong>周报导出</strong>
+              <small>DELIVERY</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">A</span>
+              <strong>追问助手</strong>
+              <small>AGENT</small>
+            </article>
+            <article class="integration-card">
+              <span class="app-icon">S</span>
+              <strong>安全审计</strong>
+              <small>AUDIT</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="capability-suite" aria-label="功能能力矩阵">
+          <div class="section-intro">
+            <span class="eyebrow">Capabilities</span>
+            <h2>从会议输入到会后执行，一套完整闭环。</h2>
+          </div>
+          <div class="capability-grid">
+            <article class="capability-card">
+              <span>01</span>
+              <h3>转写文本解析</h3>
+              <p>识别发言人、段落、句子和业务关键词，为结构化纪要准备上下文。</p>
+            </article>
+            <article class="capability-card">
+              <span>02</span>
+              <h3>结构化纪要</h3>
+              <p>自动输出摘要、证据、决策、风险、主题和追问建议。</p>
+            </article>
+            <article class="capability-card">
+              <span>03</span>
+              <h3>责任事项追踪</h3>
+              <p>提炼负责人、任务、截止时间和状态，支持按进展筛选。</p>
+            </article>
+            <article class="capability-card">
+              <span>04</span>
+              <h3>会议质量评分</h3>
+              <p>根据决策数量、待办完整度、风险覆盖和发言参与度生成评分。</p>
+            </article>
+            <article class="capability-card">
+              <span>05</span>
+              <h3>纪要上下文追问</h3>
+              <p>围绕当前纪要继续问决策、风险、负责人和截止时间。</p>
+            </article>
+            <article class="capability-card">
+              <span>06</span>
+              <h3>交付导出</h3>
+              <p>支持复制纪要、导出 Markdown / JSON，方便进入周报和任务系统。</p>
+            </article>
+          </div>
+        </section>
+
         <section class="feature-showcase" data-scene="0">
           <div class="showcase-stage" aria-hidden="true">
             <div class="aura-ring"></div>
@@ -368,6 +612,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=12"></script>
   </body>
 </html>
