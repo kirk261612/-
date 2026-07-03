@@ -36,6 +36,10 @@ const viewMeta = {
   export: {
     title: "交付导出",
     subtitle: "复制或导出 Markdown / JSON，用于周报、邮件和任务系统。"
+  },
+  subscription: {
+    title: "订阅方案",
+    subtitle: "为个人、团队和企业选择不同级别的 AI 会议效率能力。"
   }
 };
 
