@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>会速记 AI 会议纪要助手</title>
-    <link rel="stylesheet" href="styles.css?v=22">
+    <link rel="stylesheet" href="styles.css?v=25">
   </head>
   <body>
     <header class="store-nav">
@@ -20,6 +20,7 @@
         <a class="nav-item" href="#actions" data-view-target="actions">待办</a>
         <a class="nav-item" href="#ask" data-view-target="ask">追问</a>
         <a class="nav-item" href="#notes" data-view-target="notes">笔记</a>
+        <a class="nav-item" href="#history" data-view-target="history">历史</a>
         <a class="nav-item" href="#export" data-view-target="export">导出</a>
         <a class="nav-item" href="#subscription" data-view-target="subscription">订阅</a>
       </nav>
@@ -219,6 +220,16 @@
               </div>
               <button class="icon-button" id="loadSampleButton" title="载入示例" aria-label="载入示例">↺</button>
             </div>
+
+            <label class="field">
+              <span>会议模板</span>
+              <select id="meetingTemplateSelect">
+                <option value="operation">运营复盘</option>
+                <option value="weekly">项目周会</option>
+                <option value="review">需求评审</option>
+                <option value="interview">客户访谈</option>
+              </select>
+            </label>
 
             <label class="field">
               <span>会议标题</span>
@@ -509,6 +520,7 @@
               <button class="segment active" data-filter="全部">全部</button>
               <button class="segment" data-filter="待开始">待开始</button>
               <button class="segment" data-filter="进行中">进行中</button>
+              <button class="segment" data-filter="已完成">已完成</button>
             </div>
           </div>
           <div class="table-wrap">
@@ -598,6 +610,25 @@
         </div>
       </section>
 
+      <section class="view" id="historyView" data-view="history" aria-label="历史纪要">
+        <div class="history-heading">
+          <div>
+            <span class="eyebrow">Minutes Library</span>
+            <h2>历史纪要库</h2>
+            <p>自动保存在当前浏览器中，可搜索、重新打开或删除。</p>
+          </div>
+          <div class="history-tools">
+            <input id="historySearchInput" type="search" placeholder="搜索标题、摘要或参会人" aria-label="搜索历史纪要">
+            <button class="ghost-button" id="clearHistoryButton" type="button">清空历史</button>
+          </div>
+        </div>
+        <div class="history-summary">
+          <strong id="historyCount">0</strong>
+          <span>份已保存纪要</span>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </section>
+
       <section class="view" id="exportView" data-view="export" aria-label="交付导出">
         <article class="panel export-page" id="export">
           <div class="panel-head">
@@ -611,6 +642,7 @@
             <div class="export-actions">
               <button class="primary-button" id="exportMarkdownButtonSide">导出 Markdown</button>
               <button class="ghost-button" id="exportJsonButton">导出 JSON</button>
+              <button class="ghost-button" id="exportCalendarButton">导出待办日历</button>
               <button class="ghost-button" id="copyButtonSide">复制到剪贴板</button>
             </div>
             <pre class="export-preview" id="exportPreview">生成纪要后，这里会显示可交付的 Markdown 预览。</pre>
@@ -683,7 +715,7 @@
             <p id="checkoutPlanDescription">不限次数整理与 PPT 生成。</p>
             <div class="checkout-price"><strong id="checkoutPrice">¥69</strong><span id="checkoutUnit">/月</span></div>
             <ul id="checkoutFeatures"></ul>
-            <div class="secure-note">演示支付不会产生真实扣款。完成后会在本地保存订阅状态。</div>
+            <div class="secure-note">请在微信或支付宝中确认收款方与金额。本页面不自动校验到账，点击完成后仅在本地保存订阅状态。</div>
           </section>
           <section class="panel payment-panel" aria-label="支付方式">
             <div class="panel-head">
@@ -696,26 +728,17 @@
             <div class="payment-methods" id="paymentMethods">
               <button class="payment-method active" data-payment-method="wechat" type="button"><span class="pay-mark wechat">微</span>微信支付</button>
               <button class="payment-method" data-payment-method="alipay" type="button"><span class="pay-mark alipay">支</span>支付宝</button>
-              <button class="payment-method" data-payment-method="visa" type="button"><span class="pay-mark visa">VISA</span>Visa</button>
-              <button class="payment-method" data-payment-method="mastercard" type="button"><span class="pay-mark mastercard">MC</span>Mastercard</button>
-              <button class="payment-method" data-payment-method="amex" type="button"><span class="pay-mark amex">AX</span>American Express</button>
             </div>
             <div class="wallet-payment" id="walletPayment">
-              <div class="payment-code" aria-hidden="true"></div>
+              <div class="payment-code" id="paymentCode">
+                <img class="qr-source wechat-qr" id="paymentQrImage" src="assets/wechat-qr-source.jpg" alt="微信收款二维码">
+              </div>
               <div>
                 <strong id="walletTitle">微信扫码支付</strong>
-                <p>打开对应 App 扫描二维码，或点击下方按钮完成演示支付。</p>
+                <p id="walletHint">打开微信扫描二维码，完成后点击下方按钮继续。</p>
               </div>
             </div>
-            <div class="card-payment" id="cardPayment" hidden>
-              <label class="field"><span>持卡人姓名</span><input id="cardHolder" type="text" value="ZHANG MIN" autocomplete="cc-name"></label>
-              <label class="field"><span>卡号</span><input id="cardNumber" type="text" value="4242 4242 4242 4242" inputmode="numeric" autocomplete="cc-number"></label>
-              <div class="card-row">
-                <label class="field"><span>有效期</span><input id="cardExpiry" type="text" value="12/29" inputmode="numeric" autocomplete="cc-exp"></label>
-                <label class="field"><span>安全码</span><input id="cardCvc" type="password" value="123" inputmode="numeric" autocomplete="cc-csc"></label>
-              </div>
-            </div>
-            <button class="primary-button payment-confirm" id="confirmPaymentButton" type="button">确认支付 ¥69</button>
+            <button class="primary-button payment-confirm" id="confirmPaymentButton" type="button">我已完成支付 · ¥69</button>
           </section>
         </div>
       </section>
@@ -754,6 +777,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=22"></script>
+    <script src="app.js?v=25"></script>
   </body>
 </html>

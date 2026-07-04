@@ -19,13 +19,34 @@ const state = {
   selectedPlan: "pro",
   paymentMethod: "wechat",
   pendingView: null,
-  organizedNotes: null
+  organizedNotes: null,
+  minutesHistory: []
 };
 
 const $ = selector => document.querySelector(selector);
 const authStorageKey = "meeting-minutes-user";
 const subscriptionStorageKey = "meeting-minutes-subscription";
-const protectedViews = new Set(["dashboard", "intelligence", "actions", "ask", "notes", "export"]);
+const historyStorageKey = "meeting-minutes-history";
+const protectedViews = new Set(["dashboard", "intelligence", "actions", "ask", "notes", "history", "export"]);
+
+const meetingTemplates = {
+  operation: {
+    title: "7 月运营活动复盘会",
+    transcript: sampleText
+  },
+  weekly: {
+    title: "项目周会",
+    transcript: "林晨：本周完成登录和支付页面联调，核心流程已经可以演示。\n周宁：数据看板还缺少导出指标，计划周四前补齐。\n陈洁：决定周五进行灰度发布，周四下午完成验收。\n林晨：风险是移动端兼容测试时间较短，我负责补充测试清单并在周四中午前同步结果。"
+  },
+  review: {
+    title: "需求评审会",
+    transcript: "产品：本次评审目标是确认历史纪要和日历导出范围。\n设计：历史列表需要支持搜索、打开和删除，移动端使用单列布局。\n开发：功能可以在本周五前完成，需要产品今天确认字段。\n产品：决定第一版使用浏览器本地存储，不接入云端数据库。\n测试：风险是旧数据兼容，明天下午前补充回归用例。"
+  },
+  interview: {
+    title: "客户访谈整理",
+    transcript: "访谈员：您目前如何整理会议内容？\n客户：主要依赖手工复制到文档，希望能自动提炼行动项。\n访谈员：导出方面最需要什么？\n客户：希望可以生成 PPT，并把待办同步到日历。\n客户：团队还需要搜索历史会议，快速找到以前的决策。\n访谈员：本次结论是优先优化整理、历史检索和交付能力。"
+  }
+};
 
 const subscriptionPlans = {
   personal: {
@@ -79,6 +100,10 @@ const viewMeta = {
     title: "笔记整理",
     subtitle: "把零散记录整理为摘要、重点、行动项，并生成可下载的演示文稿。"
   },
+  history: {
+    title: "历史纪要",
+    subtitle: "搜索、重新打开或管理保存在当前浏览器中的会议纪要。"
+  },
   export: {
     title: "交付导出",
     subtitle: "复制或导出 Markdown / JSON，用于周报、邮件和任务系统。"
@@ -89,7 +114,7 @@ const viewMeta = {
   },
   payment: {
     title: "支付订阅",
-    subtitle: "选择微信、支付宝或国际信用卡完成订阅。"
+    subtitle: "选择微信或支付宝二维码完成订阅支付。"
   }
 };
 
@@ -448,6 +473,125 @@ function recordPlanUsage(type) {
   saveSubscription(state.subscription);
 }
 
+function loadMinutesHistory() {
+  try {
+    const saved = window.localStorage.getItem(historyStorageKey);
+    const items = saved ? JSON.parse(saved) : [];
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMinutesHistory() {
+  try {
+    window.localStorage.setItem(historyStorageKey, JSON.stringify(state.minutesHistory.slice(0, 20)));
+  } catch {
+    // History remains available for the current session if storage is unavailable.
+  }
+}
+
+function archiveMinutes(minutes, transcript) {
+  const item = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    savedAt: new Date().toISOString(),
+    title: minutes.title || "未命名会议",
+    transcript,
+    minutes
+  };
+  state.minutesHistory = [item, ...state.minutesHistory].slice(0, 20);
+  saveMinutesHistory();
+  renderHistory();
+}
+
+function renderHistory(query = "") {
+  const list = $("#historyList");
+  if (!list) return;
+  const keyword = query.trim().toLowerCase();
+  const items = state.minutesHistory.filter(item => {
+    const searchable = [item.title, ...(item.minutes?.summary || []), ...(item.minutes?.participants || [])].join(" ").toLowerCase();
+    return !keyword || searchable.includes(keyword);
+  });
+  $("#historyCount").textContent = String(state.minutesHistory.length);
+  list.innerHTML = "";
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = keyword ? "没有找到匹配的纪要。" : "生成第一份纪要后，它会自动保存在这里。";
+    list.appendChild(empty);
+    return;
+  }
+
+  items.forEach(item => {
+    const article = document.createElement("article");
+    article.className = "history-card";
+    const content = document.createElement("div");
+    const meta = document.createElement("div");
+    meta.className = "history-meta";
+    const date = document.createElement("span");
+    date.textContent = new Date(item.savedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const people = document.createElement("span");
+    people.textContent = `${item.minutes?.participants?.length || 0} 位参会人`;
+    meta.append(date, people);
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+    const summary = document.createElement("p");
+    summary.textContent = item.minutes?.summary?.[0] || "暂无摘要";
+    content.append(meta, title, summary);
+
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+    const openButton = document.createElement("button");
+    openButton.className = "primary-button";
+    openButton.type = "button";
+    openButton.dataset.historyOpen = item.id;
+    openButton.textContent = "打开纪要";
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "ghost-button";
+    deleteButton.type = "button";
+    deleteButton.dataset.historyDelete = item.id;
+    deleteButton.textContent = "删除";
+    actions.append(openButton, deleteButton);
+    article.append(content, actions);
+    list.appendChild(article);
+  });
+}
+
+function openHistoryItem(id) {
+  const item = state.minutesHistory.find(entry => entry.id === id);
+  if (!item) return;
+  $("#titleInput").value = item.title;
+  $("#transcriptInput").value = item.transcript || "";
+  state.lastTranscript = item.transcript || "";
+  renderMinutes(item.minutes);
+  setView("dashboard");
+  showToast("历史纪要已重新打开。");
+}
+
+function deleteHistoryItem(id) {
+  state.minutesHistory = state.minutesHistory.filter(item => item.id !== id);
+  saveMinutesHistory();
+  renderHistory($("#historySearchInput").value);
+  showToast("历史纪要已删除。");
+}
+
+function clearMinutesHistory() {
+  state.minutesHistory = [];
+  saveMinutesHistory();
+  $("#historySearchInput").value = "";
+  renderHistory();
+  showToast("历史纪要已清空。");
+}
+
+function applyMeetingTemplate(templateId) {
+  const template = meetingTemplates[templateId];
+  if (!template) return;
+  $("#titleInput").value = template.title;
+  $("#transcriptInput").value = template.transcript;
+  renderTranscriptStats(analyzeTranscript(template.transcript));
+  showToast("会议模板已载入。");
+}
+
 function renderCheckout() {
   const plan = subscriptionPlans[state.selectedPlan] || subscriptionPlans.pro;
   $("#checkoutPlanName").textContent = plan.name;
@@ -455,7 +599,7 @@ function renderCheckout() {
   $("#checkoutPrice").textContent = `¥${plan.price}`;
   $("#checkoutUnit").textContent = plan.unit;
   $("#checkoutFeatures").innerHTML = plan.features.map(item => `<li>${item}</li>`).join("");
-  $("#confirmPaymentButton").textContent = `确认支付 ¥${plan.price}`;
+  $("#confirmPaymentButton").textContent = `我已完成支付 · ¥${plan.price}`;
 }
 
 function startCheckout(planId) {
@@ -466,14 +610,18 @@ function startCheckout(planId) {
 }
 
 function selectPaymentMethod(method) {
+  if (method !== "wechat" && method !== "alipay") method = "wechat";
   state.paymentMethod = method;
   document.querySelectorAll("[data-payment-method]").forEach(button => {
     button.classList.toggle("active", button.dataset.paymentMethod === method);
   });
-  const isWallet = method === "wechat" || method === "alipay";
-  $("#walletPayment").hidden = !isWallet;
-  $("#cardPayment").hidden = isWallet;
-  if (isWallet) $("#walletTitle").textContent = method === "wechat" ? "微信扫码支付" : "支付宝扫码支付";
+  const isWechat = method === "wechat";
+  const image = $("#paymentQrImage");
+  image.src = isWechat ? "assets/wechat-qr-source.jpg" : "assets/alipay-qr-source.jpg";
+  image.className = `qr-source ${isWechat ? "wechat-qr" : "alipay-qr"}`;
+  image.alt = isWechat ? "微信收款二维码" : "支付宝收款二维码";
+  $("#walletTitle").textContent = isWechat ? "微信扫码支付" : "支付宝扫码支付";
+  $("#walletHint").textContent = `打开${isWechat ? "微信" : "支付宝"}扫描二维码，完成后点击下方按钮继续。`;
 }
 
 function confirmPayment() {
@@ -521,6 +669,7 @@ function setView(view, options = {}) {
   if (window.scrollY > 0) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+  if (nextView === "history") renderHistory($("#historySearchInput")?.value || "");
   queueRevealRefresh();
   window.requestAnimationFrame(updateIntroShowcase);
 }
@@ -776,13 +925,35 @@ function renderActionTable(minutes) {
   }
   items.forEach(item => {
     const tr = document.createElement("tr");
-    [item.owner, item.task, item.due, item.status].forEach(value => {
+    [item.owner, item.task, item.due].forEach(value => {
       const td = document.createElement("td");
       td.textContent = value || "待确认";
       tr.appendChild(td);
     });
+    const statusCell = document.createElement("td");
+    const statusButton = document.createElement("button");
+    statusButton.className = "status-control";
+    statusButton.type = "button";
+    statusButton.dataset.actionId = String(item.id);
+    statusButton.dataset.status = item.status || "待开始";
+    statusButton.textContent = item.status || "待开始";
+    statusButton.title = "点击更新状态";
+    statusCell.appendChild(statusButton);
+    tr.appendChild(statusCell);
     table.appendChild(tr);
   });
+}
+
+function cycleActionStatus(id) {
+  if (!state.minutes) return;
+  const item = (state.minutes.actionItems || []).find(action => String(action.id) === String(id));
+  if (!item) return;
+  const statuses = ["待开始", "进行中", "已完成"];
+  const currentIndex = Math.max(0, statuses.indexOf(item.status));
+  item.status = statuses[(currentIndex + 1) % statuses.length];
+  renderActionTable(state.minutes);
+  renderExportPreview();
+  showToast(`待办状态已更新为“${item.status}”。`);
 }
 
 function renderMinutes(minutes) {
@@ -868,12 +1039,15 @@ async function generateMinutes() {
   $("#answerBox").textContent = "";
   try {
     const payload = await postJson("/api/minutes", { title, transcript });
-    renderMinutes(enrichMinutes(payload.minutes, transcript));
+    const minutes = enrichMinutes(payload.minutes, transcript);
+    renderMinutes(minutes);
+    archiveMinutes(minutes, transcript);
     recordPlanUsage("ai");
     showToast("纪要已生成。");
   } catch (error) {
     const minutes = enrichMinutes(summarizeLocal(title, transcript), transcript);
     renderMinutes(minutes);
+    archiveMinutes(minutes, transcript);
     recordPlanUsage("ai");
     showToast("后端 API 暂不可用，已自动切换到浏览器本地兜底。");
   } finally {
@@ -970,6 +1144,75 @@ function exportJson() {
   }
   downloadFile(`${state.minutes.title || "minutes"}.json`, JSON.stringify(state.minutes, null, 2), "application/json;charset=utf-8");
   showToast("JSON 已导出。");
+}
+
+function escapeIcs(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function resolveDueDate(due, offset = 1) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  if (/明天/.test(due)) date.setDate(date.getDate() + 1);
+  else if (/后天/.test(due)) date.setDate(date.getDate() + 2);
+  else {
+    const monthDay = String(due || "").match(/(\d{1,2})月(\d{1,2})日/);
+    const isoDate = String(due || "").match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    const weekDay = String(due || "").match(/(?:周|星期)([一二三四五六日天])/);
+    if (isoDate) date.setFullYear(Number(isoDate[1]), Number(isoDate[2]) - 1, Number(isoDate[3]));
+    else if (monthDay) date.setMonth(Number(monthDay[1]) - 1, Number(monthDay[2]));
+    else if (weekDay) {
+      const dayMap = { 日: 0, 天: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
+      const target = dayMap[weekDay[1]];
+      const delta = (target - date.getDay() + 7) % 7 || 7;
+      date.setDate(date.getDate() + delta);
+    } else date.setDate(date.getDate() + offset);
+  }
+  return date;
+}
+
+function formatIcsDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function exportActionCalendar() {
+  if (!requireSubscription("导出待办日历", "export")) return;
+  const actions = state.minutes?.actionItems || [];
+  if (!actions.length) {
+    showToast("当前纪要没有可导出的待办事项。");
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const events = actions.map((item, index) => {
+    const start = resolveDueDate(item.due, index + 1);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return [
+      "BEGIN:VEVENT",
+      `UID:${Date.now()}-${index}@minutes-ai.local`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${formatIcsDate(start)}`,
+      `DTEND;VALUE=DATE:${formatIcsDate(end)}`,
+      `SUMMARY:${escapeIcs(item.task)}`,
+      `DESCRIPTION:${escapeIcs(`负责人：${item.owner || "待分配"}；状态：${item.status || "待开始"}`)}`,
+      "END:VEVENT"
+    ].join("\r\n");
+  });
+  const calendar = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Minutes AI//Action Calendar//ZH-CN",
+    "CALSCALE:GREGORIAN",
+    ...events,
+    "END:VCALENDAR"
+  ].join("\r\n");
+  $("#exportCalendarButton").dataset.lastIcsSize = String(calendar.length);
+  $("#exportCalendarButton").dataset.lastIcsEvents = String(actions.length);
+  downloadFile(`${state.minutes.title || "会议待办"}.ics`, calendar, "text/calendar;charset=utf-8");
+  showToast("待办日历已生成并开始下载。");
 }
 
 function loadMinutesToNotes() {
@@ -1189,6 +1432,7 @@ $("#copyButton").addEventListener("click", copyMinutes);
 $("#exportMarkdownButton").addEventListener("click", exportMarkdown);
 $("#exportMarkdownButtonSide").addEventListener("click", exportMarkdown);
 $("#exportJsonButton").addEventListener("click", exportJson);
+$("#exportCalendarButton").addEventListener("click", exportActionCalendar);
 $("#copyButtonSide").addEventListener("click", copyMinutes);
 $("#loginButton").addEventListener("click", openAuthModal);
 $("#mobileLoginButton").addEventListener("click", openAuthModal);
@@ -1217,6 +1461,20 @@ $("#actionFilters").addEventListener("click", event => {
   $("#actionFilters").querySelectorAll(".segment").forEach(item => item.classList.toggle("active", item === button));
   if (state.minutes) renderActionTable(state.minutes);
 });
+$("#actionTable").addEventListener("click", event => {
+  const button = event.target.closest("[data-action-id]");
+  if (!button) return;
+  cycleActionStatus(button.dataset.actionId);
+});
+$("#meetingTemplateSelect").addEventListener("change", event => applyMeetingTemplate(event.target.value));
+$("#historySearchInput").addEventListener("input", event => renderHistory(event.target.value));
+$("#clearHistoryButton").addEventListener("click", clearMinutesHistory);
+$("#historyList").addEventListener("click", event => {
+  const openButton = event.target.closest("[data-history-open]");
+  const deleteButton = event.target.closest("[data-history-delete]");
+  if (openButton) openHistoryItem(openButton.dataset.historyOpen);
+  if (deleteButton) deleteHistoryItem(deleteButton.dataset.historyDelete);
+});
 document.querySelectorAll("[data-view-target]").forEach(item => {
   item.addEventListener("click", event => {
     event.preventDefault();
@@ -1224,6 +1482,7 @@ document.querySelectorAll("[data-view-target]").forEach(item => {
   });
 });
 $("#loadSampleButton").addEventListener("click", () => {
+  $("#meetingTemplateSelect").value = "operation";
   $("#transcriptInput").value = sampleText;
   renderTranscriptStats(analyzeTranscript(sampleText));
   showToast("示例会议已载入。");
@@ -1253,10 +1512,12 @@ window.addEventListener("hashchange", () => {
 
 state.currentUser = loadSavedUser();
 state.subscription = loadSavedSubscription();
+state.minutesHistory = loadMinutesHistory();
 updateAuthUI();
 updateSubscriptionUI();
 renderCheckout();
 selectPaymentMethod(state.paymentMethod);
 renderInitial();
+renderHistory();
 setView((window.location.hash || "#intro").slice(1));
 initScrollMotion();

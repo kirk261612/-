@@ -42,7 +42,8 @@ body.modal-open {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -199,7 +200,8 @@ h1 {
 body[data-view="intro"] .hero,
 body[data-view="subscription"] .hero,
 body[data-view="payment"] .hero,
-body[data-view="notes"] .hero {
+body[data-view="notes"] .hero,
+body[data-view="history"] .hero {
   display: none;
 }
 
@@ -766,7 +768,8 @@ body[data-view="intro"] .intro-only {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -775,9 +778,15 @@ textarea {
   outline: none;
 }
 
-input {
+input,
+select {
   min-height: 48px;
   padding: 0 14px;
+}
+
+select {
+  color-scheme: dark;
+  cursor: pointer;
 }
 
 textarea {
@@ -1029,6 +1038,34 @@ th {
   font-size: 14px;
 }
 
+.status-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: rgba(243, 244, 244, 0.045);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-control[data-status="进行中"] {
+  color: #609ade;
+  border-color: rgba(96, 154, 222, 0.28);
+  background: rgba(96, 154, 222, 0.08);
+}
+
+.status-control[data-status="已完成"] {
+  color: var(--green);
+  border-color: rgba(62, 201, 162, 0.28);
+  background: rgba(62, 201, 162, 0.08);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -1258,7 +1295,8 @@ pre {
 }
 
 .notes-heading,
-.payment-heading {
+.payment-heading,
+.history-heading {
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -1267,10 +1305,104 @@ pre {
 }
 
 .notes-heading h2,
-.payment-heading h2 {
+.payment-heading h2,
+.history-heading h2 {
   max-width: 760px;
   font-size: clamp(32px, 4.6vw, 56px);
   line-height: 1.08;
+}
+
+.history-heading {
+  align-items: center;
+}
+
+.history-heading p {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.history-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(520px, 100%);
+}
+
+.history-tools input {
+  flex: 1;
+}
+
+.history-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-summary strong {
+  color: var(--green);
+  font-size: 36px;
+}
+
+.history-summary span {
+  color: var(--muted);
+}
+
+.history-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.history-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  min-height: 190px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.history-card h3 {
+  margin: 8px 0 10px;
+  font-size: 21px;
+}
+
+.history-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: rgba(243, 244, 244, 0.48);
+  font-size: 12px;
+}
+
+.history-actions {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.history-empty {
+  grid-column: 1 / -1;
+  padding: 64px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .notes-workspace,
@@ -1443,12 +1575,10 @@ pre {
 
 .pay-mark.wechat { background: #16a568; }
 .pay-mark.alipay { background: #1677ff; }
-.pay-mark.mastercard { background: #c84838; }
-.pay-mark.amex { background: #2b9da4; }
 
 .wallet-payment {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   align-items: center;
   gap: 20px;
   min-height: 180px;
@@ -1465,33 +1595,32 @@ pre {
 }
 
 .payment-code {
-  width: 132px;
+  position: relative;
+  width: 240px;
   aspect-ratio: 1;
-  border: 10px solid #f3f4f4;
-  background:
-    linear-gradient(90deg, #030404 12px, transparent 12px) 0 0 / 24px 24px,
-    linear-gradient(#030404 12px, transparent 12px) 12px 12px / 24px 24px,
-    #f3f4f4;
-}
-
-.card-payment {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--line);
+  overflow: hidden;
+  border: 12px solid #f3f4f4;
   border-radius: 8px;
-  background: rgba(243, 244, 244, 0.035);
+  background: #f3f4f4;
 }
 
-.card-payment[hidden],
-.wallet-payment[hidden] {
-  display: none;
+.qr-source {
+  position: absolute;
+  display: block;
+  max-width: none;
+  height: auto;
 }
 
-.card-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+.qr-source.wechat-qr {
+  top: -81.6%;
+  left: -65.7%;
+  width: 230.6%;
+}
+
+.qr-source.alipay-qr {
+  top: -91.4%;
+  left: -31.7%;
+  width: 163.5%;
 }
 
 .payment-confirm {
@@ -2154,6 +2283,19 @@ pre {
     min-height: auto;
   }
 
+  .history-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .history-tools {
+    width: 100%;
+  }
+
+  .history-list {
+    grid-template-columns: 1fr;
+  }
+
   .integration-copy {
     min-height: auto;
     padding: 8px;
@@ -2304,20 +2446,33 @@ pre {
   .module-grid,
   .stat-grid,
   .organized-grid,
-  .payment-methods,
-  .card-row {
+  .payment-methods {
     grid-template-columns: 1fr;
   }
 
   .notes-heading,
   .payment-heading,
-  .notes-actions {
+  .notes-actions,
+  .history-tools {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .history-card {
+    grid-template-columns: 1fr;
+  }
+
+  .history-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .wallet-payment {
     grid-template-columns: 1fr;
+  }
+
+  .payment-code {
+    width: min(240px, 100%);
+    margin: 0 auto;
   }
 
   .primary-button,
